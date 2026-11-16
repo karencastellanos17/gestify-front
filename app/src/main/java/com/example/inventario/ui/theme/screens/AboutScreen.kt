@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.inventario.ui.theme.components.GestifyMark
@@ -36,10 +37,12 @@ import com.example.inventario.ui.theme.components.WaveFooter
 private data class InfoCardData(val icon: ImageVector, val title: String, val description: String)
 private data class GuideStep(val title: String, val description: String)
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AboutScreen() {
     val colors = MaterialTheme.colorScheme
     var selectedSection by remember { mutableIntStateOf(0) }
+    val isPhone = LocalConfiguration.current.screenWidthDp < 700
 
     Column(
         modifier = Modifier
@@ -53,13 +56,15 @@ fun AboutScreen() {
             icon = Icons.Default.Lightbulb
         )
 
-        // Pestañas
         val chipColors = FilterChipDefaults.filterChipColors(
             selectedContainerColor = colors.primary.copy(alpha = 0.15f),
             selectedLabelColor = colors.primary,
             selectedLeadingIconColor = colors.primary
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             listOf(
                 Triple("Quiénes somos", Icons.Default.Groups, 0),
                 Triple("Qué ofrecemos", Icons.Default.Star, 1),
@@ -85,8 +90,8 @@ fun AboutScreen() {
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     when (section) {
-                        0 -> WhoWeAreSection()
-                        1 -> WhatWeOfferSection()
+                        0 -> WhoWeAreSection(isPhone = isPhone)
+                        1 -> WhatWeOfferSection(isPhone = isPhone)
                         else -> GuideSection()
                     }
                 }
@@ -119,7 +124,7 @@ private fun SectionCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(24.dp),
+                    .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
                 content = content
             )
@@ -127,9 +132,8 @@ private fun SectionCard(
     }
 }
 
-// ───────── Quiénes somos ─────────
 @Composable
-private fun WhoWeAreSection() {
+private fun WhoWeAreSection(isPhone: Boolean) {
     val colors = MaterialTheme.colorScheme
 
     SectionCard {
@@ -137,7 +141,7 @@ private fun WhoWeAreSection() {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            GestifyMark(size = 64.dp)
+            GestifyMark(size = 56.dp)
             Column {
                 Text(
                     text = "Gestify",
@@ -168,37 +172,46 @@ private fun WhoWeAreSection() {
         )
     }
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(IntrinsicSize.Max),
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        listOf(
-            InfoCardData(
-                Icons.Default.Flag,
-                "Nuestra misión",
-                "Ayudar a los emprendedores a gestionar su negocio de forma simple, ordenada y sin complicaciones."
-            ),
-            InfoCardData(
-                Icons.Default.Visibility,
-                "Nuestra visión",
-                "Ser la herramienta de confianza de los pequeños negocios para tomar mejores decisiones y crecer."
-            ),
-            InfoCardData(
-                Icons.Default.Star,
-                "Nuestros valores",
-                "Sencillez, claridad en la información, cuidado de tus datos y mejora continua."
-            )
-        ).forEach { item ->
-            InfoCard(item, Modifier.weight(1f).fillMaxHeight())
+    val cards = listOf(
+        InfoCardData(
+            Icons.Default.Flag,
+            "Nuestra misión",
+            "Ayudar a los emprendedores a gestionar su negocio de forma simple, ordenada y sin complicaciones."
+        ),
+        InfoCardData(
+            Icons.Default.Visibility,
+            "Nuestra visión",
+            "Ser la herramienta de confianza de los pequeños negocios para tomar mejores decisiones y crecer."
+        ),
+        InfoCardData(
+            Icons.Default.Star,
+            "Nuestros valores",
+            "Sencillez, claridad en la información, cuidado de tus datos y mejora continua."
+        )
+    )
+
+    if (isPhone) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            cards.forEach { item ->
+                InfoCard(item, Modifier.fillMaxWidth())
+            }
+        }
+    } else {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Max),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            cards.forEach { item ->
+                InfoCard(item, Modifier.weight(1f).fillMaxHeight())
+            }
         }
     }
 }
 
-// ───────── Qué ofrecemos ─────────
 @Composable
-private fun WhatWeOfferSection() {
+private fun WhatWeOfferSection(isPhone: Boolean) {
     val features = listOf(
         InfoCardData(
             Icons.Default.Inventory2,
@@ -245,21 +258,28 @@ private fun WhatWeOfferSection() {
         )
     }
 
-    features.chunked(3).forEach { rowItems ->
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Max),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            rowItems.forEach { item ->
-                InfoCard(item, Modifier.weight(1f).fillMaxHeight())
+    if (isPhone) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            features.forEach { item ->
+                InfoCard(item, Modifier.fillMaxWidth())
+            }
+        }
+    } else {
+        features.chunked(3).forEach { rowItems ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Max),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                rowItems.forEach { item ->
+                    InfoCard(item, Modifier.weight(1f).fillMaxHeight())
+                }
             }
         }
     }
 }
 
-// ───────── Guía de uso ─────────
 @Composable
 private fun GuideSection() {
     val colors = MaterialTheme.colorScheme
@@ -287,7 +307,7 @@ private fun GuideSection() {
         ),
         GuideStep(
             "Personaliza tu app",
-            "En Ajustes elige la paleta de color que más te guste. El modo claro u oscuro se cambia desde el menú lateral."
+            "En Ajustes elige la paleta de color que más te guste. El modo claro u oscuro se cambia desde la barra superior."
         )
     )
 
@@ -301,11 +321,11 @@ private fun GuideSection() {
         steps.forEachIndexed { index, step ->
             Row(
                 verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(34.dp)
                         .background(Brush.linearGradient(listOf(colors.primary, colors.secondary)), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
@@ -316,7 +336,7 @@ private fun GuideSection() {
                         color = colors.onPrimary
                     )
                 }
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
                     Text(
                         text = step.title,
                         style = MaterialTheme.typography.titleMedium,
@@ -368,7 +388,8 @@ private fun GuideSection() {
                 Text(
                     text = tip,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = colors.onSurface
+                    color = colors.onSurface,
+                    modifier = Modifier.weight(1f)
                 )
             }
         }

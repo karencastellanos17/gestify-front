@@ -4,7 +4,6 @@ import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -12,16 +11,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.runtime.collectAsState
-import com.example.inventario.ui.theme.viewmodel.GestifyViewModel
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Add
@@ -41,8 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -62,7 +54,8 @@ import com.example.inventario.ui.theme.components.StatusBadge
 import com.example.inventario.ui.theme.components.StatusBadgeStyle
 import com.example.inventario.ui.theme.components.WaveFooter
 import com.example.inventario.ui.theme.components.formFieldColors
-
+import com.example.inventario.ui.theme.viewmodel.GestifyViewModel
+import com.example.inventario.utils.ValidationUtils
 import java.io.File
 import java.util.Locale
 
@@ -73,32 +66,34 @@ fun InventoryScreen(
     val colors = MaterialTheme.colorScheme
     val context = LocalContext.current
     val products by viewModel.products.collectAsState()
+    val isPhone = LocalConfiguration.current.screenWidthDp < 700
 
     var showAddDialog by remember { mutableStateOf(false) }
     var productToEdit by remember { mutableStateOf<Product?>(null) }
     var productToToggle by remember { mutableStateOf<Product?>(null) }
-    var isGalleryView by remember { mutableStateOf(false) }
+    var isGalleryView by remember { mutableStateOf(isPhone) }
 
-    // Métricas calculadas a partir de la lista real del backend
     val activeCount = products.count { it.isActive }
     val lowStockCount = products.count { it.isActive && it.stock < 5 }
-    // Asegúrate de que esta línea en InventoryScreen tenga el *
     val inventoryValue = products.filter { it.isActive }.sumOf { it.price * it.stock }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // ───────── Banner del módulo con botón de acción ─────────
         ModuleBanner(
             title = "Control de Inventario y Stock",
             subtitle = "Gestión de productos conectada al backend con Cloudinary.",
             icon = Icons.Default.Inventory2,
             action = {
                 Button(
-                    onClick = { showAddDialog = true },
+                    onClick = {
+                        viewModel.clearError()
+                        showAddDialog = true
+                    },
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = colors.onPrimary,
@@ -108,64 +103,83 @@ fun InventoryScreen(
                 ) {
                     Icon(Icons.Default.Add, contentDescription = "Agregar", modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Nuevo Producto", style = MaterialTheme.typography.titleMedium)
+                    Text("Nuevo Producto", style = MaterialTheme.typography.titleSmall)
                 }
             }
         )
 
-        // ───────── Métricas rápidas ─────────
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Max),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            StatCard(
-                label = "Productos activos",
-                value = "$activeCount de ${products.size}",
-                icon = Icons.Default.CheckCircle,
-                modifier = Modifier.weight(1f).fillMaxHeight()
-            )
-            StatCard(
-                label = "Stock bajo",
-                value = "$lowStockCount productos",
-                icon = Icons.Default.Warning,
-                accent = colors.error,
-                modifier = Modifier.weight(1f).fillMaxHeight()
-            )
-            StatCard(
-                label = "Valor del inventario",
-                value = "$${String.format(Locale.US, "%,.0f", inventoryValue)}",
-                icon = Icons.Default.Payments,
-                modifier = Modifier.weight(1f).fillMaxHeight()
-            )
+        if (isPhone) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                StatCard(
+                    label = "Productos activos",
+                    value = "$activeCount de ${products.size}",
+                    icon = Icons.Default.CheckCircle,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                StatCard(
+                    label = "Stock bajo",
+                    value = "$lowStockCount productos",
+                    icon = Icons.Default.Warning,
+                    accent = colors.error,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                StatCard(
+                    label = "Valor del inventario",
+                    value = "$${String.format(Locale.US, "%,.0f", inventoryValue)}",
+                    icon = Icons.Default.Payments,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Max),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                StatCard(
+                    label = "Productos activos",
+                    value = "$activeCount de ${products.size}",
+                    icon = Icons.Default.CheckCircle,
+                    modifier = Modifier.weight(1f).fillMaxHeight()
+                )
+                StatCard(
+                    label = "Stock bajo",
+                    value = "$lowStockCount productos",
+                    icon = Icons.Default.Warning,
+                    accent = colors.error,
+                    modifier = Modifier.weight(1f).fillMaxHeight()
+                )
+                StatCard(
+                    label = "Valor del inventario",
+                    value = "$${String.format(Locale.US, "%,.0f", inventoryValue)}",
+                    icon = Icons.Default.Payments,
+                    modifier = Modifier.weight(1f).fillMaxHeight()
+                )
+            }
         }
 
-        // ───────── Catálogo (lista o galería) ─────────
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
+            modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
             border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.4f)),
             colors = CardDefaults.cardColors(containerColor = colors.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.fillMaxWidth()) {
                 WaveFooter(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(120.dp)
+                        .height(100.dp)
                         .align(Alignment.BottomCenter),
                     color = colors.primary.copy(alpha = 0.05f)
                 )
 
                 Column(
                     modifier = Modifier
-                        .fillMaxSize()
+                        .fillMaxWidth()
                         .padding(16.dp)
                 ) {
-                    // Título + selector de vista
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -174,105 +188,102 @@ fun InventoryScreen(
                         Text(
                             text = "Catálogo de productos",
                             style = MaterialTheme.typography.titleLarge,
-                            color = colors.primary
+                            color = colors.primary,
+                            modifier = Modifier.weight(1f)
                         )
 
-                        val chipColors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = colors.primary.copy(alpha = 0.15f),
-                            selectedLabelColor = colors.primary,
-                            selectedLeadingIconColor = colors.primary
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilterChip(
-                                selected = !isGalleryView,
-                                onClick = { isGalleryView = false },
-                                label = { Text("Lista") },
-                                leadingIcon = {
-                                    Icon(Icons.AutoMirrored.Filled.ViewList, contentDescription = null, modifier = Modifier.size(18.dp))
-                                },
-                                colors = chipColors,
-                                shape = RoundedCornerShape(50)
+                        if (!isPhone) {
+                            val chipColors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = colors.primary.copy(alpha = 0.15f),
+                                selectedLabelColor = colors.primary,
+                                selectedLeadingIconColor = colors.primary
                             )
-                            FilterChip(
-                                selected = isGalleryView,
-                                onClick = { isGalleryView = true },
-                                label = { Text("Galería") },
-                                leadingIcon = {
-                                    Icon(Icons.Default.GridView, contentDescription = null, modifier = Modifier.size(18.dp))
-                                },
-                                colors = chipColors,
-                                shape = RoundedCornerShape(50)
-                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilterChip(
+                                    selected = !isGalleryView,
+                                    onClick = { isGalleryView = false },
+                                    label = { Text("Lista") },
+                                    leadingIcon = {
+                                        Icon(Icons.AutoMirrored.Filled.ViewList, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    },
+                                    colors = chipColors,
+                                    shape = RoundedCornerShape(50)
+                                )
+                                FilterChip(
+                                    selected = isGalleryView,
+                                    onClick = { isGalleryView = true },
+                                    label = { Text("Galería") },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.GridView, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    },
+                                    colors = chipColors,
+                                    shape = RoundedCornerShape(50)
+                                )
+                            }
                         }
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    Crossfade(
-                        targetState = isGalleryView,
-                        modifier = Modifier.weight(1f),
-                        label = "InventoryView"
-                    ) { gallery ->
-                        if (products.isEmpty()) {
-                            EmptyState(
-                                icon = Icons.Default.Inventory2,
-                                title = "Aún no tienes productos",
-                                message = "Agrega tu primer producto para empezar a controlar tu stock.",
-                                actionText = "Nuevo Producto",
-                                onAction = { showAddDialog = true },
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        } else if (gallery) {
-                            LazyVerticalGrid(
-                                columns = GridCells.Adaptive(minSize = 220.dp),
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(16.dp)
-                            ) {
-                                items(products, key = { it.id }) { product ->
-                                    ProductGalleryCard(
-                                        product = product,
-                                        onEditRequest = { productToEdit = product },
-                                        onToggleRequest = { productToToggle = product }
-                                    )
-                                }
+                    if (products.isEmpty()) {
+                        EmptyState(
+                            icon = Icons.Default.Inventory2,
+                            title = "Aún no tienes productos",
+                            message = "Agrega tu primer producto para empezar a controlar tu stock.",
+                            actionText = "Nuevo Producto",
+                            onAction = {
+                                viewModel.clearError()
+                                showAddDialog = true
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(260.dp)
+                        )
+                    } else if (isPhone || isGalleryView) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            products.forEach { product ->
+                                ProductGalleryCard(
+                                    product = product,
+                                    onEditRequest = {
+                                        viewModel.clearError()
+                                        productToEdit = product
+                                    },
+                                    onToggleRequest = { productToToggle = product }
+                                )
                             }
-                        } else {
-                            Column(modifier = Modifier.fillMaxSize()) {
-                                // Fila de encabezados
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(colors.primary.copy(alpha = 0.10f))
-                                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    TableHeaderCell("ID", modifier = Modifier.weight(0.6f))
-                                    TableHeaderCell("PRODUCTO", modifier = Modifier.weight(2.2f))
-                                    TableHeaderCell("CATEGORÍA", modifier = Modifier.weight(1.5f))
-                                    TableHeaderCell("PRECIO", modifier = Modifier.weight(1.1f))
-                                    TableHeaderCell("STOCK", modifier = Modifier.weight(1f))
-                                    TableHeaderCell("ESTADO", modifier = Modifier.weight(1.2f))
-                                    TableHeaderCell("ACCIONES", modifier = Modifier.weight(1.3f))
-                                }
+                        }
+                    } else {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(colors.primary.copy(alpha = 0.10f))
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                TableHeaderCell("ID", modifier = Modifier.weight(0.6f))
+                                TableHeaderCell("PRODUCTO", modifier = Modifier.weight(2.2f))
+                                TableHeaderCell("CATEGORÍA", modifier = Modifier.weight(1.5f))
+                                TableHeaderCell("PRECIO", modifier = Modifier.weight(1.1f))
+                                TableHeaderCell("STOCK", modifier = Modifier.weight(1f))
+                                TableHeaderCell("ESTADO", modifier = Modifier.weight(1.2f))
+                                TableHeaderCell("ACCIONES", modifier = Modifier.weight(1.3f))
+                            }
 
-                                Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
 
-                                LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    items(products, key = { it.id }) { product ->
-                                        Column {
-                                            ProductTableRow(
-                                                product = product,
-                                                onEditRequest = { productToEdit = product },
-                                                onToggleRequest = { productToToggle = product }
-                                            )
-                                            HorizontalDivider(color = colors.outlineVariant.copy(alpha = 0.25f))
-                                        }
-                                    }
-                                }
+                            products.forEach { product ->
+                                ProductTableRow(
+                                    product = product,
+                                    onEditRequest = {
+                                        viewModel.clearError()
+                                        productToEdit = product
+                                    },
+                                    onToggleRequest = { productToToggle = product }
+                                )
+                                HorizontalDivider(color = colors.outlineVariant.copy(alpha = 0.25f))
                             }
                         }
                     }
@@ -281,12 +292,16 @@ fun InventoryScreen(
         }
     }
 
-    // ───────── Ventana: nuevo producto ─────────
     if (showAddDialog) {
         ProductFormDialog(
             initial = null,
             existingCategories = products.map { it.category }.distinct(),
-            onDismiss = { showAddDialog = false },
+            isSaving = viewModel.isLoading,
+            serverError = viewModel.errorMessage,
+            onDismiss = {
+                viewModel.clearError()
+                showAddDialog = false
+            },
             onConfirm = { name, category, price, stock, imageUriString ->
                 val imageFile = imageUriString?.let { uriString ->
                     if (uriString.startsWith("content://") || uriString.startsWith("file://")) {
@@ -309,12 +324,16 @@ fun InventoryScreen(
         )
     }
 
-    // ───────── Ventana: editar producto ─────────
     productToEdit?.let { target ->
         ProductFormDialog(
             initial = target,
             existingCategories = products.map { it.category }.distinct(),
-            onDismiss = { productToEdit = null },
+            isSaving = viewModel.isLoading,
+            serverError = viewModel.errorMessage,
+            onDismiss = {
+                viewModel.clearError()
+                productToEdit = null
+            },
             onConfirm = { name, category, price, stock, imageUriString ->
                 val imageFile = imageUriString?.let { uriString ->
                     if (uriString.startsWith("content://") || uriString.startsWith("file://")) {
@@ -335,7 +354,6 @@ fun InventoryScreen(
         )
     }
 
-    // ───────── Ventana: confirmar desactivar / restaurar ─────────
     productToToggle?.let { target ->
         val deactivating = target.isActive
         ModernDialog(
@@ -362,7 +380,6 @@ fun InventoryScreen(
     }
 }
 
-// Función auxiliar para convertir URI a File
 private fun uriToFile(context: Context, uri: Uri): File? {
     return try {
         val inputStream = context.contentResolver.openInputStream(uri) ?: return null
@@ -381,6 +398,8 @@ private fun uriToFile(context: Context, uri: Uri): File? {
 private fun ProductFormDialog(
     initial: Product?,
     existingCategories: List<String>,
+    isSaving: Boolean,
+    serverError: String?,
     onDismiss: () -> Unit,
     onConfirm: (name: String, category: String, price: Double, stock: Int, imageUri: String?) -> Unit
 ) {
@@ -406,22 +425,45 @@ private fun ProductFormDialog(
         if (uri != null) imageUri = uri.toString()
     }
 
+    val nameError = ValidationUtils.validateProductName(name)
+    val priceError = ValidationUtils.validatePrice(price)
+    val stockError = ValidationUtils.validateStock(stock)
+
     val priceValue = price.toDoubleOrNull()
     val stockValue = stock.toIntOrNull()
-    val isValid = name.isNotBlank() &&
+
+    val isValid = !isSaving &&
+            nameError == null &&
             category.isNotBlank() &&
-            priceValue != null && priceValue > 0 &&
-            stockValue != null && stockValue >= 0
+            priceError == null &&
+            stockError == null &&
+            priceValue != null &&
+            stockValue != null
 
     ModernDialog(
         title = if (isEditing) "Editar producto" else "Nuevo producto",
         subtitle = if (isEditing) "Modifica los datos o cambia la foto." else "Completa los datos para agregarlo al inventario.",
         icon = if (isEditing) Icons.Default.Edit else Icons.Default.Inventory2,
-        confirmText = if (isEditing) "Guardar cambios" else "Guardar producto",
+        confirmText = if (isSaving) "Guardando..." else if (isEditing) "Guardar cambios" else "Guardar producto",
         confirmEnabled = isValid,
         onConfirm = { onConfirm(name.trim(), category.trim(), priceValue!!, stockValue!!, imageUri) },
         onDismiss = onDismiss
     ) {
+        serverError?.let { error ->
+            Surface(
+                color = colors.errorContainer,
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = error,
+                    color = colors.onErrorContainer,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(12.dp)
+                )
+            }
+        }
+
         DialogSection(title = "Foto del producto", icon = Icons.Default.AddPhotoAlternate) {
             Box(
                 modifier = Modifier
@@ -497,11 +539,11 @@ private fun ProductFormDialog(
         DialogSection(title = "Información", icon = Icons.Default.Inventory2) {
             OutlinedTextField(
                 value = name,
-                onValueChange = { name = it; nameTouched = true },
+                onValueChange = { if (it.length <= 80) { name = it; nameTouched = true } },
                 label = { Text("Nombre del producto *") },
-                isError = nameTouched && name.isBlank(),
-                supportingText = if (nameTouched && name.isBlank()) {
-                    { Text("El nombre es obligatorio") }
+                isError = nameTouched && nameError != null,
+                supportingText = if (nameTouched && nameError != null) {
+                    { Text(nameError) }
                 } else null,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -527,9 +569,9 @@ private fun ProductFormDialog(
                     onValueChange = { price = it.filter { c -> c.isDigit() || c == '.' }; priceTouched = true },
                     label = { Text("Precio *") },
                     prefix = { Text("$") },
-                    isError = priceTouched && (priceValue == null || priceValue <= 0),
-                    supportingText = if (priceTouched && (priceValue == null || priceValue <= 0)) {
-                        { Text("Ingresa un precio mayor a 0") }
+                    isError = priceTouched && priceError != null,
+                    supportingText = if (priceTouched && priceError != null) {
+                        { Text(priceError) }
                     } else null,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
@@ -541,9 +583,9 @@ private fun ProductFormDialog(
                     value = stock,
                     onValueChange = { stock = it.filter { c -> c.isDigit() }; stockTouched = true },
                     label = { Text(if (isEditing) "Stock *" else "Stock inicial *") },
-                    isError = stockTouched && stockValue == null,
-                    supportingText = if (stockTouched && stockValue == null) {
-                        { Text("Ingresa el stock (0 o más)") }
+                    isError = stockTouched && stockError != null,
+                    supportingText = if (stockTouched && stockError != null) {
+                        { Text(stockError) }
                     } else null,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
@@ -651,6 +693,7 @@ private fun ProductTableRow(
         }
     }
 }
+
 @Composable
 private fun TableHeaderCell(text: String, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
@@ -694,6 +737,7 @@ private fun ToggleActionButton(isActive: Boolean, onClick: () -> Unit) {
         )
     }
 }
+
 @Composable
 private fun ProductGalleryCard(
     product: Product,
@@ -782,5 +826,4 @@ private fun ProductGalleryCard(
             }
         }
     }
-
 }

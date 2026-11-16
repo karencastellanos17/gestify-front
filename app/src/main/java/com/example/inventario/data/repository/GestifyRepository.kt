@@ -27,12 +27,36 @@ class GestifyRepository(context: Context) {
         }
     }
 
-    suspend fun createProduct(product: Product): Boolean = withContext(Dispatchers.IO) {
+    suspend fun createProduct(product: Product): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val response = api.createProduct(businessId, product)
-            response.isSuccessful
+            if (businessId == -1L) {
+                return@withContext Result.failure(Exception("Sesión inválida (id_negocio = -1). Cierra sesión e ingresa de nuevo."))
+            }
+            val payload = product.copy(idNegocio = businessId)
+            val response = api.createProduct(businessId, payload)
+            if (response.isSuccessful) {
+                Result.success(Unit)
+            } else {
+                val errBody = response.errorBody()?.string().orEmpty()
+                Result.failure(Exception("HTTP ${response.code()}: ${errBody.ifBlank { response.message() }}"))
+            }
         } catch (e: Exception) {
-            false
+            Result.failure(Exception("Error de red: ${e.localizedMessage}"))
+        }
+    }
+
+    suspend fun updateProduct(product: Product): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val payload = product.copy(idNegocio = businessId)
+            val response = api.updateProduct(product.id, payload)
+            if (response.isSuccessful) {
+                Result.success(Unit)
+            } else {
+                val errBody = response.errorBody()?.string().orEmpty()
+                Result.failure(Exception("HTTP ${response.code()}: ${errBody.ifBlank { response.message() }}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception("Error de red: ${e.localizedMessage}"))
         }
     }
 
@@ -54,12 +78,21 @@ class GestifyRepository(context: Context) {
         }
     }
 
-    suspend fun createSale(sale: SaleItem): Boolean = withContext(Dispatchers.IO) {
+    suspend fun createSale(sale: SaleItem): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val response = api.createSale(businessId, sale)
-            response.isSuccessful
+            if (businessId == -1L) {
+                return@withContext Result.failure(Exception("Sesión inválida (id_negocio = -1). Cierra sesión e ingresa de nuevo."))
+            }
+            val payload = sale.copy(idNegocio = businessId)
+            val response = api.createSale(businessId, payload)
+            if (response.isSuccessful) {
+                Result.success(Unit)
+            } else {
+                val errBody = response.errorBody()?.string().orEmpty()
+                Result.failure(Exception("HTTP ${response.code()}: ${errBody.ifBlank { response.message() }}"))
+            }
         } catch (e: Exception) {
-            false
+            Result.failure(Exception("Error de red: ${e.localizedMessage}"))
         }
     }
 
@@ -73,12 +106,36 @@ class GestifyRepository(context: Context) {
         }
     }
 
-    suspend fun createSupplier(supplier: Supplier): Boolean = withContext(Dispatchers.IO) {
+    suspend fun createSupplier(supplier: Supplier): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val response = api.createSupplier(businessId, supplier)
-            response.isSuccessful
+            if (businessId == -1L) {
+                return@withContext Result.failure(Exception("Sesión inválida (id_negocio = -1). Cierra sesión e ingresa de nuevo."))
+            }
+            val payload = supplier.copy(idNegocio = businessId)
+            val response = api.createSupplier(businessId, payload)
+            if (response.isSuccessful) {
+                Result.success(Unit)
+            } else {
+                val errBody = response.errorBody()?.string().orEmpty()
+                Result.failure(Exception("HTTP ${response.code()}: ${errBody.ifBlank { response.message() }}"))
+            }
         } catch (e: Exception) {
-            false
+            Result.failure(Exception("Error de red: ${e.localizedMessage}"))
+        }
+    }
+
+    suspend fun updateSupplier(supplier: Supplier): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val payload = supplier.copy(idNegocio = businessId)
+            val response = api.updateSupplier(supplier.id, payload)
+            if (response.isSuccessful) {
+                Result.success(Unit)
+            } else {
+                val errBody = response.errorBody()?.string().orEmpty()
+                Result.failure(Exception("HTTP ${response.code()}: ${errBody.ifBlank { response.message() }}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception("Error de red: ${e.localizedMessage}"))
         }
     }
 

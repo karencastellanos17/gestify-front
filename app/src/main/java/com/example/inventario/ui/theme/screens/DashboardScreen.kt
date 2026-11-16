@@ -44,17 +44,14 @@ fun DashboardScreen(
 ) {
     val colors = MaterialTheme.colorScheme
 
-    // Estados reales desde el ViewModel
     val products by viewModel.products.collectAsState()
     val sales by viewModel.sales.collectAsState()
 
-    // Datos calculados para tarjetas y gráficos
     val salesTotal = sales.sumOf { it.total }
     val activeProducts = products.filter { it.isActive }
     val stockUnits = activeProducts.sumOf { it.stock }
     val categoryCount = activeProducts.map { it.category }.distinct().size
 
-    // Alertas generadas desde el stock real
     val stockAlerts = buildStockAlerts(products)
     val criticalAlerts = stockAlerts.count { it.type == AlertType.CRITICAL }
 
@@ -64,16 +61,17 @@ fun DashboardScreen(
         .map { (category, items) -> category to items.sumOf { it.stock } }
         .filter { it.second > 0 }
 
-    val showLogo = LocalConfiguration.current.screenWidthDp >= 1100
+    val screenWidth = LocalConfiguration.current.screenWidthDp
+    val isPhone = screenWidth < 700
+    val showLogo = screenWidth >= 1100
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(4.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // ───────── Banner de Bienvenida con degradado ─────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -89,7 +87,7 @@ fun DashboardScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 32.dp, vertical = 28.dp),
+                    .padding(horizontal = if (isPhone) 20.dp else 32.dp, vertical = 22.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Row(
@@ -99,12 +97,12 @@ fun DashboardScreen(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        GestifyMark(size = 40.dp, onGradient = true)
+                        GestifyMark(size = 36.dp, onGradient = true)
                         Text(
                             text = "Gestify",
-                            style = MaterialTheme.typography.titleLarge.copy(fontSize = 26.sp),
+                            style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp),
                             fontWeight = FontWeight.Black,
                             color = colors.onPrimary
                         )
@@ -125,26 +123,24 @@ fun DashboardScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.Logout,
                             contentDescription = null,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(16.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Cerrar sesión",
-                            style = MaterialTheme.typography.titleSmall
+                            text = "Salir",
+                            style = MaterialTheme.typography.labelLarge
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
-
                 Text(
-                    text = "¡Bienvenido a Gestify, Emprendedor!",
-                    style = MaterialTheme.typography.headlineLarge,
+                    text = "¡Bienvenido a Gestify!",
+                    style = if (isPhone) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.headlineLarge,
                     color = colors.onPrimary
                 )
                 Text(
                     text = "Resumen ejecutivo del estado actual de tu negocio en tiempo real.",
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = colors.onPrimary.copy(alpha = 0.9f)
                 )
 
@@ -171,65 +167,114 @@ fun DashboardScreen(
             }
         }
 
-        // ───────── Tarjetas de Métricas (clicables) ─────────
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Max),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            MetricCard(
-                title = "Ventas del Día",
-                value = "$${String.format(Locale.US, "%,.0f", salesTotal)}",
-                subtitle = "${sales.size} transacciones",
-                badgeStyle = StatusBadgeStyle.SUCCESS,
-                modifier = Modifier.weight(1f).fillMaxHeight(),
-                onClick = onGoToSales
-            )
-            MetricCard(
-                title = "Stock Activo",
-                value = "$stockUnits Unidades",
-                subtitle = "$categoryCount Categorías",
-                badgeStyle = StatusBadgeStyle.INFO,
-                modifier = Modifier.weight(1f).fillMaxHeight(),
-                onClick = onGoToStock
-            )
-            MetricCard(
-                title = "Alertas Activas",
-                value = "${stockAlerts.size} Avisos",
-                subtitle = "$criticalAlerts Stock Crítico",
-                badgeStyle = if (criticalAlerts > 0) StatusBadgeStyle.DANGER else StatusBadgeStyle.SUCCESS,
-                modifier = Modifier.weight(1f).fillMaxHeight(),
-                onClick = onGoToAlerts
-            )
-        }
+        if (isPhone) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                MetricCard(
+                    title = "Ventas del Día",
+                    value = "$${String.format(Locale.US, "%,.0f", salesTotal)}",
+                    subtitle = "${sales.size} transacciones",
+                    badgeStyle = StatusBadgeStyle.SUCCESS,
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onGoToSales
+                )
+                MetricCard(
+                    title = "Stock Activo",
+                    value = "$stockUnits Unidades",
+                    subtitle = "$categoryCount Categorías",
+                    badgeStyle = StatusBadgeStyle.INFO,
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onGoToStock
+                )
+                MetricCard(
+                    title = "Alertas Activas",
+                    value = "${stockAlerts.size} Avisos",
+                    subtitle = "$criticalAlerts Stock Crítico",
+                    badgeStyle = if (criticalAlerts > 0) StatusBadgeStyle.DANGER else StatusBadgeStyle.SUCCESS,
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onGoToAlerts
+                )
+            }
 
-        // ───────── Gráficos ─────────
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Max),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
             ChartCard(
                 title = "Ventas recientes",
                 subtitle = "Total por transacción",
-                modifier = Modifier.weight(1.5f).fillMaxHeight()
+                modifier = Modifier.fillMaxWidth()
             ) {
                 SalesBarChart(
                     data = salesChartData,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
+
             ChartCard(
                 title = "Stock por categoría",
                 subtitle = "Unidades de productos activos",
-                modifier = Modifier.weight(1f).fillMaxHeight()
+                modifier = Modifier.fillMaxWidth()
             ) {
                 StockDonutChart(
                     data = stockChartData,
                     modifier = Modifier.fillMaxWidth()
                 )
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Max),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                MetricCard(
+                    title = "Ventas del Día",
+                    value = "$${String.format(Locale.US, "%,.0f", salesTotal)}",
+                    subtitle = "${sales.size} transacciones",
+                    badgeStyle = StatusBadgeStyle.SUCCESS,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    onClick = onGoToSales
+                )
+                MetricCard(
+                    title = "Stock Activo",
+                    value = "$stockUnits Unidades",
+                    subtitle = "$categoryCount Categorías",
+                    badgeStyle = StatusBadgeStyle.INFO,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    onClick = onGoToStock
+                )
+                MetricCard(
+                    title = "Alertas Activas",
+                    value = "${stockAlerts.size} Avisos",
+                    subtitle = "$criticalAlerts Stock Crítico",
+                    badgeStyle = if (criticalAlerts > 0) StatusBadgeStyle.DANGER else StatusBadgeStyle.SUCCESS,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    onClick = onGoToAlerts
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Max),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                ChartCard(
+                    title = "Ventas recientes",
+                    subtitle = "Total por transacción",
+                    modifier = Modifier.weight(1.5f).fillMaxHeight()
+                ) {
+                    SalesBarChart(
+                        data = salesChartData,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                ChartCard(
+                    title = "Stock por categoría",
+                    subtitle = "Unidades de productos activos",
+                    modifier = Modifier.weight(1f).fillMaxHeight()
+                ) {
+                    StockDonutChart(
+                        data = stockChartData,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
     }
@@ -263,7 +308,7 @@ private fun ChartCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(22.dp),
+                    .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
@@ -276,7 +321,7 @@ private fun ChartCard(
                     style = MaterialTheme.typography.bodyMedium,
                     color = colors.onSurfaceVariant
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 content()
             }
         }
@@ -329,9 +374,9 @@ fun MetricCard(
 
                 Column(
                     modifier = Modifier
-                        .padding(20.dp)
+                        .padding(18.dp)
                         .fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -361,7 +406,7 @@ fun MetricCard(
 
                     Text(
                         text = value,
-                        style = MaterialTheme.typography.headlineMedium,
+                        style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         color = colors.primary
                     )

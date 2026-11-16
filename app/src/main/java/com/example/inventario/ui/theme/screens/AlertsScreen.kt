@@ -3,10 +3,10 @@ package com.example.inventario.ui.theme.screens
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.inventario.data.model.Product
@@ -30,18 +31,16 @@ import com.example.inventario.ui.theme.components.StatusBadge
 import com.example.inventario.ui.theme.components.StatusBadgeStyle
 import com.example.inventario.ui.theme.components.WaveFooter
 
-// Umbrales de stock (ajústalos a tu negocio)
-const val LOW_STOCK_LIMIT = 5        // menos de 5 unidades genera alerta
-const val CRITICAL_STOCK_LIMIT = 2   // 2 o menos es crítica
-const val RESTOCK_TARGET = 15        // stock al que se recomienda volver
+const val LOW_STOCK_LIMIT = 5
+const val CRITICAL_STOCK_LIMIT = 2
+const val RESTOCK_TARGET = 15
 
-// Modelo para las alertas del sistema
 data class AlertItem(
     val id: Int,
     val title: String,
     val description: String,
-    val type: AlertType, // Urgente (Crítica) o Advertencia
-    val suppliers: List<Supplier> = emptyList(), // Proveedores activos que distribuyen el producto
+    val type: AlertType,
+    val suppliers: List<Supplier> = emptyList(),
     val suggestedQuantity: Int = 0
 )
 
@@ -49,7 +48,6 @@ enum class AlertType {
     CRITICAL, WARNING
 }
 
-/** Genera las alertas a partir del stock real de los productos activos. */
 fun buildStockAlerts(
     products: List<Product>,
     suppliers: List<Supplier> = emptyList()
@@ -72,7 +70,7 @@ fun buildStockAlerts(
                     "Quedan solo ${product.stock} unidades en inventario.",
                 type = if (isCritical) AlertType.CRITICAL else AlertType.WARNING,
                 suppliers = suppliers.filter { it.isActive && it.distributes(product) },
-                suggestedQuantity = RESTOCK_TARGET - product.stock
+                suggestedQuantity = (RESTOCK_TARGET - product.stock).coerceAtLeast(1)
             )
         }
 
@@ -83,6 +81,7 @@ fun AlertsScreen(
     onGoToSuppliers: () -> Unit = {}
 ) {
     val colors = MaterialTheme.colorScheme
+    val isPhone = LocalConfiguration.current.screenWidthDp < 700
 
     val alertsList = remember(products, suppliers) { buildStockAlerts(products, suppliers) }
     val criticalCount = alertsList.count { it.type == AlertType.CRITICAL }
@@ -91,67 +90,88 @@ fun AlertsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // ───────── Banner del módulo ─────────
         ModuleBanner(
             title = "Centro de Alertas y Notificaciones",
             subtitle = "Monitoreo en tiempo real de stock mínimo y recomendación de proveedor.",
             icon = Icons.Default.Notifications
         )
 
-        // ───────── Resumen por tipo de alerta ─────────
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Max),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            StatCard(
-                label = "Críticas",
-                value = "$criticalCount alertas",
-                icon = Icons.Default.Warning,
-                accent = colors.error,
-                modifier = Modifier.weight(1f).fillMaxHeight()
-            )
-            StatCard(
-                label = "Avisos",
-                value = "$warningCount alertas",
-                icon = Icons.Default.Info,
-                accent = colors.secondary,
-                modifier = Modifier.weight(1f).fillMaxHeight()
-            )
-            StatCard(
-                label = "Total pendientes",
-                value = "${alertsList.size} alertas",
-                icon = Icons.Default.Notifications,
-                modifier = Modifier.weight(1f).fillMaxHeight()
-            )
+        if (isPhone) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                StatCard(
+                    label = "Críticas",
+                    value = "$criticalCount alertas",
+                    icon = Icons.Default.Warning,
+                    accent = colors.error,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                StatCard(
+                    label = "Avisos",
+                    value = "$warningCount alertas",
+                    icon = Icons.Default.Info,
+                    accent = colors.secondary,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                StatCard(
+                    label = "Total pendientes",
+                    value = "${alertsList.size} alertas",
+                    icon = Icons.Default.Notifications,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Max),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                StatCard(
+                    label = "Críticas",
+                    value = "$criticalCount alertas",
+                    icon = Icons.Default.Warning,
+                    accent = colors.error,
+                    modifier = Modifier.weight(1f).fillMaxHeight()
+                )
+                StatCard(
+                    label = "Avisos",
+                    value = "$warningCount alertas",
+                    icon = Icons.Default.Info,
+                    accent = colors.secondary,
+                    modifier = Modifier.weight(1f).fillMaxHeight()
+                )
+                StatCard(
+                    label = "Total pendientes",
+                    value = "${alertsList.size} alertas",
+                    icon = Icons.Default.Notifications,
+                    modifier = Modifier.weight(1f).fillMaxHeight()
+                )
+            }
         }
 
-        // ───────── Listado de alertas ─────────
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
+            modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
             border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.4f)),
             colors = CardDefaults.cardColors(containerColor = colors.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.fillMaxWidth()) {
                 WaveFooter(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(120.dp)
+                        .height(100.dp)
                         .align(Alignment.BottomCenter),
                     color = colors.primary.copy(alpha = 0.05f)
                 )
 
                 Column(
                     modifier = Modifier
-                        .fillMaxSize()
+                        .fillMaxWidth()
                         .padding(20.dp)
                 ) {
                     Row(
@@ -160,9 +180,10 @@ fun AlertsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Avisos Pendientes de Atención",
+                            text = "Avisos Pendientes",
                             style = MaterialTheme.typography.titleLarge,
-                            color = colors.primary
+                            color = colors.primary,
+                            modifier = Modifier.weight(1f)
                         )
 
                         StatusBadge(
@@ -174,9 +195,10 @@ fun AlertsScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     if (alertsList.isEmpty()) {
-                        // Estado vacío: todo en orden
                         Column(
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 32.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
@@ -199,10 +221,8 @@ fun AlertsScreen(
                             )
                         }
                     } else {
-                        LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(alertsList, key = { it.id }) { alert ->
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            alertsList.forEach { alert ->
                                 AlertCard(alert = alert, onGoToSuppliers = onGoToSuppliers)
                             }
                         }
@@ -220,7 +240,6 @@ private fun AlertCard(
 ) {
     val colors = MaterialTheme.colorScheme
     val isCritical = alert.type == AlertType.CRITICAL
-    // Colores 100% del tema: error para críticas, secondary para avisos
     val accent = if (isCritical) colors.error else colors.secondary
 
     Card(
@@ -236,7 +255,6 @@ private fun AlertCard(
                 .height(IntrinsicSize.Min)
                 .background(accent.copy(alpha = 0.06f))
         ) {
-            // Barra lateral de color
             Box(
                 modifier = Modifier
                     .width(6.dp)
@@ -247,7 +265,7 @@ private fun AlertCard(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(20.dp),
+                    .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Row(
@@ -257,7 +275,7 @@ private fun AlertCard(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(44.dp)
+                            .size(40.dp)
                             .background(accent.copy(alpha = 0.15f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
@@ -265,15 +283,15 @@ private fun AlertCard(
                             imageVector = if (isCritical) Icons.Default.Warning else Icons.Default.Info,
                             contentDescription = null,
                             tint = accent,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
 
-                    Spacer(modifier = Modifier.width(16.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
 
                     Column(
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
                             text = alert.title,
@@ -288,7 +306,7 @@ private fun AlertCard(
                         )
                     }
 
-                    Spacer(modifier = Modifier.width(16.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
 
                     StatusBadge(
                         text = if (isCritical) "Urgente" else "Aviso",
@@ -376,7 +394,7 @@ private fun SupplierSuggestion(
                                 color = colors.onSurface
                             )
                             Text(
-                                text = "Contacto: ${supplier.contactName.ifBlank { "—" }}  ·  Tel: ${supplier.phone}",
+                                text = "Contacto: ${supplier.contactName.ifBlank { "—" }} · Tel: ${supplier.phone}",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = colors.onSurfaceVariant
                             )

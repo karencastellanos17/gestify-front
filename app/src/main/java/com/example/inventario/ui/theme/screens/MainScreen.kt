@@ -8,8 +8,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -33,7 +31,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.inventario.ui.theme.Temas.InventarioTheme
@@ -42,7 +42,6 @@ import com.example.inventario.ui.theme.components.GestifyMark
 import com.example.inventario.ui.theme.viewmodel.GestifyViewModel
 import com.example.inventario.utils.AppThemeColor
 
-// Entrada del menú lateral
 private data class NavEntry(
     val tab: Int,
     val label: String,
@@ -72,85 +71,180 @@ fun MainScreen(
     var currentThemeColor by remember { mutableStateOf(AppThemeColor.BLUE) }
     var isDarkMode by remember { mutableStateOf(false) }
 
-    // ─── AQUÍ ESTABA EL DETALLE: Se declaran y recolectan del ViewModel ───
     val products by viewModel.products.collectAsState()
     val suppliers by viewModel.suppliers.collectAsState()
-    // ─────────────────────────────────────────────────────────────────────
+
+    val screenWidth = LocalConfiguration.current.screenWidthDp
+    val isPhone = screenWidth < 700
+    val compactMenu = screenWidth < 1100
 
     InventarioTheme(selectedColor = currentThemeColor, darkTheme = isDarkMode) {
         val colors = MaterialTheme.colorScheme
 
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(colors.background)
-        ) {
-            // Menú lateral
-            // Variable para saber si la ventana es angosta y compactar el menú
-            val compactMenu = LocalConfiguration.current.screenWidthDp < 1100
-            GestifySidebar(
-                selectedTab = selectedTab,
-                onSelect = { selectedTab = it },
-                isDarkMode = isDarkMode,
-                onDarkModeChange = { isDarkMode = it },
-                compact = compactMenu
-            )
+        if (isPhone) {
+            Scaffold(
+                modifier = Modifier.fillMaxSize(),
+                topBar = {
+                    Surface(
+                        color = colors.primary,
+                        shadowElevation = 4.dp
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .statusBarsPadding()
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                GestifyMark(size = 32.dp, onGradient = true)
+                                Text(
+                                    text = "Gestify",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Black,
+                                    color = colors.onPrimary
+                                )
+                            }
 
-            if (isDarkMode) {
-                VerticalDivider(color = colors.outlineVariant.copy(alpha = 0.6f))
-            }
-
-            // Contenido principal
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .weight(1f)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(colors.primary.copy(alpha = 0.08f), colors.background)
-                        )
-                    )
-            ) {
-                BrandBackdrop(
-                    modifier = Modifier.fillMaxSize(),
-                    tint = colors.primary,
-                    scale = 0.9f,
-                    alphaScale = 0.6f
-                )
-
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                IconButton(onClick = { selectedTab = 6 }) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.MenuBook,
+                                        contentDescription = "Guía",
+                                        tint = if (selectedTab == 6) colors.onPrimary else colors.onPrimary.copy(alpha = 0.75f)
+                                    )
+                                }
+                                IconButton(onClick = { selectedTab = 4 }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Settings,
+                                        contentDescription = "Ajustes",
+                                        tint = if (selectedTab == 4) colors.onPrimary else colors.onPrimary.copy(alpha = 0.75f)
+                                    )
+                                }
+                                IconButton(onClick = { isDarkMode = !isDarkMode }) {
+                                    Icon(
+                                        imageVector = if (isDarkMode) Icons.Default.DarkMode else Icons.Default.LightMode,
+                                        contentDescription = "Tema",
+                                        tint = colors.onPrimary
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
+                bottomBar = {
+                    NavigationBar(
+                        containerColor = colors.surface,
+                        tonalElevation = 8.dp
+                    ) {
+                        topNavItems.forEach { entry ->
+                            NavigationBarItem(
+                                selected = selectedTab == entry.tab,
+                                onClick = { selectedTab = entry.tab },
+                                icon = {
+                                    Icon(
+                                        imageVector = entry.icon,
+                                        contentDescription = entry.label
+                                    )
+                                },
+                                label = {
+                                    Text(
+                                        text = entry.label,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                },
+                                alwaysShowLabel = true
+                            )
+                        }
+                    }
+                }
+            ) { innerPadding ->
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(24.dp),
-                    contentAlignment = Alignment.TopStart
+                        .padding(innerPadding)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(colors.primary.copy(alpha = 0.08f), colors.background)
+                            )
+                        )
                 ) {
-                    Crossfade(
-                        targetState = selectedTab,
-                        animationSpec = tween(durationMillis = 250),
-                        label = "ScreenTransition"
-                    ) { tab ->
-                        when (tab) {
-                            0 -> DashboardScreen(
-                                onLogout = onLogout,
-                                onGoToSales = { selectedTab = 2 },
-                                onGoToStock = { selectedTab = 1 },
-                                onGoToAlerts = { selectedTab = 3 }
-                            )
-                            1 -> InventoryScreen()
-                            2 -> SalesScreen()
-                            3 -> AlertsScreen(
-                                products = products,
-                                suppliers = suppliers,
-                                onGoToSuppliers = { selectedTab = 5 }
-                            )
+                    BrandBackdrop(
+                        modifier = Modifier.fillMaxSize(),
+                        tint = colors.primary,
+                        scale = 0.9f,
+                        alphaScale = 0.6f
+                    )
 
-                            4 -> SettingsScreen(
-                                selectedThemeColor = currentThemeColor,
-                                onThemeSelected = { newColor -> currentThemeColor = newColor }
+                    ScreenContent(
+                        selectedTab = selectedTab,
+                        onSelectTab = { selectedTab = it },
+                        onLogout = onLogout,
+                        products = products,
+                        suppliers = suppliers,
+                        currentThemeColor = currentThemeColor,
+                        onThemeSelected = { currentThemeColor = it },
+                        isDarkMode = isDarkMode
+                    )
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(colors.background)
+                    .statusBarsPadding()
+            ) {
+                GestifySidebar(
+                    selectedTab = selectedTab,
+                    onSelect = { selectedTab = it },
+                    isDarkMode = isDarkMode,
+                    onDarkModeChange = { isDarkMode = it },
+                    compact = compactMenu
+                )
+
+                if (isDarkMode) {
+                    VerticalDivider(color = colors.outlineVariant.copy(alpha = 0.6f))
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .weight(1f)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(colors.primary.copy(alpha = 0.08f), colors.background)
                             )
-                            5 -> SuppliersScreen()
-                            6 -> AboutScreen()
-                        }
+                        )
+                ) {
+                    BrandBackdrop(
+                        modifier = Modifier.fillMaxSize(),
+                        tint = colors.primary,
+                        scale = 0.9f,
+                        alphaScale = 0.6f
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.TopStart
+                    ) {
+                        ScreenContent(
+                            selectedTab = selectedTab,
+                            onSelectTab = { selectedTab = it },
+                            onLogout = onLogout,
+                            products = products,
+                            suppliers = suppliers,
+                            currentThemeColor = currentThemeColor,
+                            onThemeSelected = { currentThemeColor = it },
+                            isDarkMode = isDarkMode
+                        )
                     }
                 }
             }
@@ -158,7 +252,47 @@ fun MainScreen(
     }
 }
 
-// Colores del menú según el modo
+@Composable
+private fun ScreenContent(
+    selectedTab: Int,
+    onSelectTab: (Int) -> Unit,
+    onLogout: () -> Unit,
+    products: List<com.example.inventario.data.model.Product>,
+    suppliers: List<com.example.inventario.data.model.Supplier>,
+    currentThemeColor: AppThemeColor,
+    onThemeSelected: (AppThemeColor) -> Unit,
+    isDarkMode: Boolean
+) {
+    Crossfade(
+        targetState = selectedTab,
+        animationSpec = tween(durationMillis = 250),
+        label = "ScreenTransition"
+    ) { tab ->
+        when (tab) {
+            0 -> DashboardScreen(
+                onLogout = onLogout,
+                onGoToSales = { onSelectTab(2) },
+                onGoToStock = { onSelectTab(1) },
+                onGoToAlerts = { onSelectTab(3) }
+            )
+            1 -> InventoryScreen()
+            2 -> SalesScreen()
+            3 -> AlertsScreen(
+                products = products,
+                suppliers = suppliers,
+                onGoToSuppliers = { onSelectTab(5) }
+            )
+            4 -> SettingsScreen(
+                selectedThemeColor = currentThemeColor,
+                onThemeSelected = onThemeSelected,
+                isDarkMode = isDarkMode
+            )
+            5 -> SuppliersScreen()
+            6 -> AboutScreen()
+        }
+    }
+}
+
 private data class SidebarPalette(
     val content: Color,
     val contentMuted: Color,

@@ -3,13 +3,12 @@ package com.example.inventario.ui.theme.screens
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
@@ -32,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -51,12 +51,14 @@ import com.example.inventario.ui.theme.components.StatusBadgeStyle
 import com.example.inventario.ui.theme.components.WaveFooter
 import com.example.inventario.ui.theme.components.formFieldColors
 import com.example.inventario.ui.theme.viewmodel.GestifyViewModel
+import com.example.inventario.utils.ValidationUtils
 
 @Composable
 fun SuppliersScreen(
     viewModel: GestifyViewModel = viewModel()
 ) {
     val colors = MaterialTheme.colorScheme
+    val isPhone = LocalConfiguration.current.screenWidthDp < 700
 
     val suppliers by viewModel.suppliers.collectAsState()
     val products by viewModel.products.collectAsState()
@@ -66,13 +68,11 @@ fun SuppliersScreen(
     var supplierToToggle by remember { mutableStateOf<Supplier?>(null) }
     var query by remember { mutableStateOf("") }
 
-    // Métricas (solo lectura)
     val activeSuppliers = suppliers.filter { it.isActive }
     val activeProducts = products.filter { it.isActive }
     val coveredCount = activeProducts.count { product -> activeSuppliers.any { it.distributes(product) } }
-    val uncoveredCount = activeProducts.size - coveredCount // Corregido operador faltante
+    val uncoveredCount = (activeProducts.size - coveredCount).coerceAtLeast(0)
 
-    // Buscador: nombre, contacto, categoría, productos vinculados o escritos a mano
     val filtered = suppliers.filter { supplier ->
         query.isBlank() ||
                 supplier.name.contains(query, ignoreCase = true) ||
@@ -85,17 +85,20 @@ fun SuppliersScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // ───────── Banner ─────────
         ModuleBanner(
             title = "Proveedores",
             subtitle = "Directorio conectado al backend para gestionar tus abastecedores.",
             icon = Icons.Default.LocalShipping,
             action = {
                 Button(
-                    onClick = { showAddDialog = true },
+                    onClick = {
+                        viewModel.clearError()
+                        showAddDialog = true
+                    },
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = colors.onPrimary,
@@ -105,74 +108,105 @@ fun SuppliersScreen(
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Nuevo Proveedor", style = MaterialTheme.typography.titleMedium)
+                    Text("Nuevo Proveedor", style = MaterialTheme.typography.titleSmall)
                 }
             }
         )
 
-        // ───────── Métricas ─────────
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Max),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            StatCard(
-                label = "Proveedores activos",
-                value = "${activeSuppliers.size}",
-                icon = Icons.Default.LocalShipping,
-                modifier = Modifier.weight(1f).fillMaxHeight()
-            )
-            StatCard(
-                label = "Productos con proveedor",
-                value = "$coveredCount de ${activeProducts.size}",
-                icon = Icons.Default.CheckCircle,
-                modifier = Modifier.weight(1f).fillMaxHeight()
-            )
-            StatCard(
-                label = "Sin proveedor",
-                value = "$uncoveredCount productos",
-                icon = Icons.Default.Warning,
-                accent = if (uncoveredCount > 0) colors.error else colors.primary,
-                modifier = Modifier.weight(1f).fillMaxHeight()
-            )
+        viewModel.errorMessage?.let { error ->
+            Surface(
+                color = colors.errorContainer,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Error del servidor: $error",
+                    color = colors.onErrorContainer,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(14.dp)
+                )
+            }
         }
 
-        // ───────── Directorio ─────────
+        if (isPhone) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                StatCard(
+                    label = "Proveedores activos",
+                    value = "${activeSuppliers.size}",
+                    icon = Icons.Default.LocalShipping,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                StatCard(
+                    label = "Productos con proveedor",
+                    value = "$coveredCount de ${activeProducts.size}",
+                    icon = Icons.Default.CheckCircle,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                StatCard(
+                    label = "Sin proveedor",
+                    value = "$uncoveredCount productos",
+                    icon = Icons.Default.Warning,
+                    accent = if (uncoveredCount > 0) colors.error else colors.primary,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Max),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                StatCard(
+                    label = "Proveedores activos",
+                    value = "${activeSuppliers.size}",
+                    icon = Icons.Default.LocalShipping,
+                    modifier = Modifier.weight(1f).fillMaxHeight()
+                )
+                StatCard(
+                    label = "Productos con proveedor",
+                    value = "$coveredCount de ${activeProducts.size}",
+                    icon = Icons.Default.CheckCircle,
+                    modifier = Modifier.weight(1f).fillMaxHeight()
+                )
+                StatCard(
+                    label = "Sin proveedor",
+                    value = "$uncoveredCount productos",
+                    icon = Icons.Default.Warning,
+                    accent = if (uncoveredCount > 0) colors.error else colors.primary,
+                    modifier = Modifier.weight(1f).fillMaxHeight()
+                )
+            }
+        }
+
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
+            modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
             border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.4f)),
             colors = CardDefaults.cardColors(containerColor = colors.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.fillMaxWidth()) {
                 WaveFooter(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(120.dp)
+                        .height(100.dp)
                         .align(Alignment.BottomCenter),
                     color = colors.primary.copy(alpha = 0.05f)
                 )
 
                 Column(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp)
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    if (isPhone) {
                         Text(
                             text = "Directorio de proveedores",
                             style = MaterialTheme.typography.titleLarge,
                             color = colors.primary
                         )
-
                         OutlinedTextField(
                             value = query,
                             onValueChange = { query = it },
@@ -180,48 +214,70 @@ fun SuppliersScreen(
                             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                             singleLine = true,
                             shape = RoundedCornerShape(50),
-                            modifier = Modifier.width(320.dp)
+                            modifier = Modifier.fillMaxWidth()
                         )
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Directorio de proveedores",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = colors.primary
+                            )
+
+                            OutlinedTextField(
+                                value = query,
+                                onValueChange = { query = it },
+                                placeholder = { Text("Buscar proveedor o producto") },
+                                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                                singleLine = true,
+                                shape = RoundedCornerShape(50),
+                                modifier = Modifier.width(320.dp)
+                            )
+                        }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    when {
+                        suppliers.isEmpty() -> EmptyState(
+                            icon = Icons.Default.LocalShipping,
+                            title = "Aún no tienes proveedores",
+                            message = "Registra a quién le compras y qué te distribuye. Así la app podrá recomendarte a quién pedirle cuando el stock baje.",
+                            actionText = "Nuevo Proveedor",
+                            onAction = {
+                                viewModel.clearError()
+                                showAddDialog = true
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(260.dp)
+                        )
 
-                    Box(modifier = Modifier.weight(1f)) {
-                        when {
-                            suppliers.isEmpty() -> EmptyState(
-                                icon = Icons.Default.LocalShipping,
-                                title = "Aún no tienes proveedores",
-                                message = "Registra a quién le compras y qué te distribuye. Así la app podrá recomendarte a quién pedirle cuando el stock baje.",
-                                actionText = "Nuevo Proveedor",
-                                onAction = { showAddDialog = true },
-                                modifier = Modifier.fillMaxSize()
-                            )
+                        filtered.isEmpty() -> EmptyState(
+                            icon = Icons.Default.Search,
+                            title = "Sin resultados",
+                            message = "No encontramos proveedores para «$query». Prueba con otro nombre o producto.",
+                            actionText = "Limpiar búsqueda",
+                            onAction = { query = "" },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(260.dp)
+                        )
 
-                            filtered.isEmpty() -> EmptyState(
-                                icon = Icons.Default.Search,
-                                title = "Sin resultados",
-                                message = "No encontramos proveedores para «$query». Prueba con otro nombre o producto.",
-                                actionText = "Limpiar búsqueda",
-                                onAction = { query = "" },
-                                modifier = Modifier.fillMaxSize()
-                            )
-
-                            else -> LazyVerticalGrid(
-                                columns = GridCells.Adaptive(minSize = 340.dp),
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(16.dp)
-                            ) {
-                                items(filtered, key = { it.id }) { supplier ->
-                                    SupplierCard(
-                                        supplier = supplier,
-                                        items = (products.filter { it.id in supplier.productIds }.map { it.name } +
-                                                supplier.extraItems).distinctBy { it.lowercase() },
-                                        onEditRequest = { supplierToEdit = supplier },
-                                        onToggleRequest = { supplierToToggle = supplier }
-                                    )
-                                }
+                        else -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            filtered.forEach { supplier ->
+                                SupplierCard(
+                                    supplier = supplier,
+                                    items = (products.filter { it.id in supplier.productIds }.map { it.name } +
+                                            supplier.extraItems).distinctBy { it.lowercase() },
+                                    onEditRequest = {
+                                        viewModel.clearError()
+                                        supplierToEdit = supplier
+                                    },
+                                    onToggleRequest = { supplierToToggle = supplier }
+                                )
                             }
                         }
                     }
@@ -230,12 +286,16 @@ fun SuppliersScreen(
         }
     }
 
-    // ───────── Ventana: nuevo proveedor ─────────
     if (showAddDialog) {
         SupplierFormDialog(
             initial = null,
             products = products,
-            onDismiss = { showAddDialog = false },
+            isSaving = viewModel.isLoading,
+            serverError = viewModel.errorMessage,
+            onDismiss = {
+                viewModel.clearError()
+                showAddDialog = false
+            },
             onConfirm = { name, contactName, phone, category, productIds, extraItems ->
                 val newSupplier = Supplier(
                     id = 0,
@@ -243,8 +303,8 @@ fun SuppliersScreen(
                     contactName = contactName,
                     phone = phone,
                     category = category,
-                    productIds = productIds,
-                    extraItems = extraItems,
+                    _productIds = productIds,
+                    _extraItems = extraItems,
                     isActive = true
                 )
                 viewModel.createSupplier(newSupplier) {
@@ -254,20 +314,24 @@ fun SuppliersScreen(
         )
     }
 
-    // ───────── Ventana: editar proveedor ─────────
     supplierToEdit?.let { target ->
         SupplierFormDialog(
             initial = target,
             products = products,
-            onDismiss = { supplierToEdit = null },
+            isSaving = viewModel.isLoading,
+            serverError = viewModel.errorMessage,
+            onDismiss = {
+                viewModel.clearError()
+                supplierToEdit = null
+            },
             onConfirm = { name, contactName, phone, category, productIds, extraItems ->
                 val updatedSupplier = target.copy(
                     name = name,
                     contactName = contactName,
                     phone = phone,
                     category = category,
-                    productIds = productIds,
-                    extraItems = extraItems
+                    _productIds = productIds,
+                    _extraItems = extraItems
                 )
                 viewModel.createSupplier(updatedSupplier) {
                     supplierToEdit = null
@@ -276,7 +340,6 @@ fun SuppliersScreen(
         )
     }
 
-    // ───────── Ventana: confirmar desactivar / restaurar ─────────
     supplierToToggle?.let { target ->
         val deactivating = target.isActive
         ModernDialog(
@@ -548,6 +611,8 @@ private fun applyTypedItem(
 private fun SupplierFormDialog(
     initial: Supplier?,
     products: List<Product>,
+    isSaving: Boolean,
+    serverError: String?,
     onDismiss: () -> Unit,
     onConfirm: (
         name: String,
@@ -563,17 +628,21 @@ private fun SupplierFormDialog(
 
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var contactName by remember { mutableStateOf(initial?.contactName ?: "") }
-    var phone by remember { mutableStateOf(initial?.phone ?: "") }
+    var phone by remember { mutableStateOf(initial?.phone?.filter { it.isDigit() }?.take(10) ?: "") }
     var category by remember { mutableStateOf(initial?.category ?: "") }
     var linkedIds by remember { mutableStateOf(initial?.productIds ?: emptyList()) }
     var manualItems by remember { mutableStateOf(initial?.extraItems ?: emptyList()) }
     var itemInput by remember { mutableStateOf("") }
 
     var nameTouched by remember { mutableStateOf(false) }
+    var contactTouched by remember { mutableStateOf(false) }
     var phoneTouched by remember { mutableStateOf(false) }
 
-    val phoneValid = phone.count { it.isDigit() } >= 7
-    val isValid = name.isNotBlank() && phoneValid
+    val nameError = ValidationUtils.validatePersonOrCompanyName(name, "El nombre del proveedor")
+    val contactError = ValidationUtils.validateContactName(contactName)
+    val phoneError = ValidationUtils.validateColombiaPhone(phone)
+
+    val isValid = !isSaving && nameError == null && contactError == null && phoneError == null
 
     fun addTypedItem() {
         val (ids, extras) = applyTypedItem(itemInput, products, linkedIds, manualItems)
@@ -589,7 +658,7 @@ private fun SupplierFormDialog(
         title = if (isEditing) "Editar proveedor" else "Nuevo proveedor",
         subtitle = if (isEditing) "Actualiza sus datos o lo que distribuye." else "Registra quién te surte y qué productos distribuye.",
         icon = if (isEditing) Icons.Default.Edit else Icons.Default.LocalShipping,
-        confirmText = if (isEditing) "Guardar cambios" else "Guardar proveedor",
+        confirmText = if (isSaving) "Guardando..." else if (isEditing) "Guardar cambios" else "Guardar proveedor",
         confirmEnabled = isValid,
         onConfirm = {
             val (finalIds, finalExtras) = applyTypedItem(itemInput, products, linkedIds, manualItems)
@@ -597,14 +666,29 @@ private fun SupplierFormDialog(
         },
         onDismiss = onDismiss
     ) {
+        serverError?.let { error ->
+            Surface(
+                color = colors.errorContainer,
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = error,
+                    color = colors.onErrorContainer,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(12.dp)
+                )
+            }
+        }
+
         DialogSection(title = "Datos del proveedor", icon = Icons.Default.LocalShipping) {
             OutlinedTextField(
                 value = name,
-                onValueChange = { name = it; nameTouched = true },
+                onValueChange = { if (it.length <= 60) { name = it; nameTouched = true } },
                 label = { Text("Nombre del proveedor o empresa *") },
-                isError = nameTouched && name.isBlank(),
-                supportingText = if (nameTouched && name.isBlank()) {
-                    { Text("El nombre es obligatorio") }
+                isError = nameTouched && nameError != null,
+                supportingText = if (nameTouched && nameError != null) {
+                    { Text(nameError) }
                 } else null,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -614,8 +698,12 @@ private fun SupplierFormDialog(
 
             OutlinedTextField(
                 value = contactName,
-                onValueChange = { contactName = it },
+                onValueChange = { if (it.length <= 50) { contactName = it; contactTouched = true } },
                 label = { Text("Persona de contacto (opcional)") },
+                isError = contactTouched && contactError != null,
+                supportingText = if (contactTouched && contactError != null) {
+                    { Text(contactError) }
+                } else null,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 singleLine = true,
@@ -624,25 +712,31 @@ private fun SupplierFormDialog(
 
             OutlinedTextField(
                 value = phone,
-                onValueChange = {
-                    phone = it.filter { c -> c.isDigit() || c == ' ' || c == '+' || c == '-' }
+                onValueChange = { input ->
+                    phone = input.filter { it.isDigit() }.take(10)
                     phoneTouched = true
                 },
-                label = { Text("Teléfono *") },
-                isError = phoneTouched && !phoneValid,
-                supportingText = if (phoneTouched && !phoneValid) {
-                    { Text("Ingresa un teléfono válido (mínimo 7 dígitos)") }
-                } else null,
+                label = { Text("Teléfono Colombia (10 dígitos) *") },
+                placeholder = { Text("3001234567") },
+                prefix = { Text("+57 ") },
+                isError = phoneTouched && phoneError != null,
+                supportingText = {
+                    if (phoneTouched && phoneError != null) {
+                        Text(phoneError)
+                    } else {
+                        Text("${phone.length}/10 dígitos (celular inicia en 3, fijo en 60)")
+                    }
+                },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 colors = formFieldColors()
             )
 
             OutlinedTextField(
                 value = category,
-                onValueChange = { category = it },
+                onValueChange = { if (it.length <= 40) category = it },
                 label = { Text("Tipo de negocio o categoría (opcional)") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -654,7 +748,7 @@ private fun SupplierFormDialog(
         DialogSection(title = "Productos que distribuye (opcional)", icon = Icons.Default.Inventory2) {
             OutlinedTextField(
                 value = itemInput,
-                onValueChange = { itemInput = it },
+                onValueChange = { if (it.length <= 50) itemInput = it },
                 label = { Text("Escribe un producto y pulsa +") },
                 trailingIcon = {
                     IconButton(onClick = { addTypedItem() }, enabled = itemInput.isNotBlank()) {

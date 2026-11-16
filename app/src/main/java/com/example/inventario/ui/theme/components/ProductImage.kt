@@ -1,6 +1,5 @@
 package com.example.inventario.ui.theme.components
 
-
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -24,8 +23,8 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.net.URL
 
-/** Foto del producto; si no hay foto, degradado del tema con la inicial. */
 @Composable
 fun ProductImage(
     imageUri: String?,
@@ -37,8 +36,14 @@ fun ProductImage(
     val colors = MaterialTheme.colorScheme
 
     val bitmap by produceState<ImageBitmap?>(initialValue = null, imageUri) {
-        value = if (imageUri == null) null
-        else withContext(Dispatchers.IO) { decodeSampledBitmap(context, Uri.parse(imageUri), 700) }
+        value = if (imageUri.isNullOrBlank()) null
+        else withContext(Dispatchers.IO) {
+            if (imageUri.startsWith("http://") || imageUri.startsWith("https://")) {
+                decodeNetworkBitmap(imageUri)
+            } else {
+                decodeSampledBitmap(context, Uri.parse(imageUri), 700)
+            }
+        }
     }
 
     Box(
@@ -64,7 +69,14 @@ fun ProductImage(
     }
 }
 
-// Decodifica reducida para no gastar memoria con fotos grandes
+private fun decodeNetworkBitmap(urlString: String): ImageBitmap? = try {
+    URL(urlString).openStream().use { stream ->
+        BitmapFactory.decodeStream(stream)?.asImageBitmap()
+    }
+} catch (e: Exception) {
+    null
+}
+
 private fun decodeSampledBitmap(context: Context, uri: Uri, maxSide: Int): ImageBitmap? = try {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }

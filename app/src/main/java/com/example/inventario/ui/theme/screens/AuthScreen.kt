@@ -3,7 +3,10 @@ package com.example.inventario.ui.theme.screens
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Visibility
@@ -13,27 +16,28 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel // <-- Importante para el ViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.inventario.ui.theme.Temas.InventarioTheme
 import com.example.inventario.ui.theme.components.BrandBackdrop
 import com.example.inventario.ui.theme.components.GestifyMark
 import com.example.inventario.ui.theme.components.InventoryLogo
+import com.example.inventario.ui.theme.viewmodel.GestifyViewModel
 import com.example.inventario.utils.AppThemeColor
-import com.example.inventario.ui.theme.viewmodel.GestifyViewModel // <-- Importante para el ViewModel
-
-private val EmailRegex = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
+import com.example.inventario.utils.ValidationUtils
 
 @Composable
 fun AuthScreen(
     onLoginSuccess: () -> Unit,
-    viewModel: GestifyViewModel = viewModel() // <-- Inyectamos el ViewModel aquí
+    viewModel: GestifyViewModel = viewModel()
 ) {
     var isLoginMode by remember { mutableStateOf(true) }
     var email by remember { mutableStateOf("") }
@@ -42,13 +46,14 @@ fun AuthScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     var showErrors by remember { mutableStateOf(false) }
 
-    // Estado de color por defecto para el login
-    var currentThemeColor by remember { mutableStateOf(AppThemeColor.BLUE) }
+    val currentThemeColor by remember { mutableStateOf(AppThemeColor.BLUE) }
 
-    // Validaciones
-    val emailValid = EmailRegex.matches(email.trim())
-    val passwordValid = password.length >= 6
-    val businessValid = isLoginMode || businessName.isNotBlank()
+    val emailError = ValidationUtils.validateEmail(email)
+    val passwordError = ValidationUtils.validatePassword(password)
+    val businessError = if (isLoginMode) null else ValidationUtils.validatePersonOrCompanyName(businessName, "El nombre del negocio")
+
+    val isFormValid = emailError == null && passwordError == null && businessError == null
+    val isWideScreen = LocalConfiguration.current.screenWidthDp >= 800
 
     InventarioTheme(selectedColor = currentThemeColor) {
         val colors = MaterialTheme.colorScheme
@@ -58,99 +63,101 @@ fun AuthScreen(
                 .fillMaxSize()
                 .background(colors.background)
         ) {
-            // ───────── Panel de marca (izquierda) ─────────
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .background(Brush.linearGradient(listOf(colors.primary, colors.secondary)))
-            ) {
-                BrandBackdrop(
-                    modifier = Modifier.fillMaxSize(),
-                    tint = colors.onPrimary
-                )
-
-                Column(
+            if (isWideScreen) {
+                Box(
                     modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .padding(horizontal = 56.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .background(Brush.linearGradient(listOf(colors.primary, colors.secondary)))
                 ) {
-                    InventoryLogo(logoSize = 120.dp)
-
-                    Text(
-                        text = "Gestify",
-                        style = MaterialTheme.typography.headlineLarge.copy(
-                            fontFamily = FontFamily.Cursive,
-                            fontSize = 104.sp,
-                            lineHeight = 112.sp,
-                            letterSpacing = 0.sp
-                        ),
-                        fontWeight = FontWeight.Bold,
-                        color = colors.onPrimary
+                    BrandBackdrop(
+                        modifier = Modifier.fillMaxSize(),
+                        tint = colors.onPrimary
                     )
 
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .width(72.dp)
-                                .height(4.dp)
-                                .background(colors.onPrimary.copy(alpha = 0.85f), RoundedCornerShape(50))
-                        )
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .padding(horizontal = 56.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        InventoryLogo(logoSize = 120.dp)
+
                         Text(
-                            text = "Gestionar mejor, crecer más",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontSize = 34.sp,
-                                lineHeight = 42.sp
+                            text = "Gestify",
+                            style = MaterialTheme.typography.headlineLarge.copy(
+                                fontFamily = FontFamily.Cursive,
+                                fontSize = 104.sp,
+                                lineHeight = 112.sp,
+                                letterSpacing = 0.sp
                             ),
-                            fontWeight = FontWeight.Medium,
-                            fontStyle = FontStyle.Italic,
+                            fontWeight = FontWeight.Bold,
                             color = colors.onPrimary
                         )
-                    }
 
-                    Text(
-                        text = "Controla tu stock, tus ventas y tus alertas desde un solo lugar.",
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontSize = 22.sp,
-                            lineHeight = 32.sp
-                        ),
-                        color = colors.onPrimary.copy(alpha = 0.92f),
-                        modifier = Modifier.widthIn(max = 520.dp)
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    listOf(
-                        "Inventario siempre actualizado",
-                        "Ventas y caja en tiempo real",
-                        "Alertas de stock y proveedor recomendado"
-                    ).forEach { item ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CheckCircle,
-                                contentDescription = null,
-                                tint = colors.onPrimary,
-                                modifier = Modifier.size(24.dp)
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .width(72.dp)
+                                    .height(4.dp)
+                                    .background(colors.onPrimary.copy(alpha = 0.85f), RoundedCornerShape(50))
                             )
                             Text(
-                                text = item,
-                                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 20.sp),
+                                text = "Gestionar mejor, crecer más",
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontSize = 34.sp,
+                                    lineHeight = 42.sp
+                                ),
+                                fontWeight = FontWeight.Medium,
+                                fontStyle = FontStyle.Italic,
                                 color = colors.onPrimary
                             )
+                        }
+
+                        Text(
+                            text = "Controla tu stock, tus ventas y tus alertas desde un solo lugar.",
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontSize = 22.sp,
+                                lineHeight = 32.sp
+                            ),
+                            color = colors.onPrimary.copy(alpha = 0.92f),
+                            modifier = Modifier.widthIn(max = 520.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        listOf(
+                            "Inventario siempre actualizado",
+                            "Ventas y caja en tiempo real",
+                            "Alertas de stock y proveedor recomendado"
+                        ).forEach { item ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = colors.onPrimary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Text(
+                                    text = item,
+                                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 20.sp),
+                                    color = colors.onPrimary
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            // ───────── Formulario (derecha) ─────────
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxHeight(),
+                    .fillMaxHeight()
+                    .statusBarsPadding()
+                    .imePadding(),
                 contentAlignment = Alignment.Center
             ) {
                 BrandBackdrop(
@@ -162,9 +169,10 @@ fun AuthScreen(
 
                 Card(
                     modifier = Modifier
-                        .width(440.dp)
-                        .wrapContentHeight()
-                        .padding(16.dp),
+                        .widthIn(max = 440.dp)
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .verticalScroll(rememberScrollState()),
                     shape = RoundedCornerShape(24.dp),
                     border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.4f)),
                     colors = CardDefaults.cardColors(containerColor = colors.surface),
@@ -173,7 +181,7 @@ fun AuthScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(36.dp),
+                            .padding(24.dp),
                         horizontalAlignment = Alignment.Start,
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
@@ -181,13 +189,13 @@ fun AuthScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            GestifyMark(size = 48.dp)
+                            GestifyMark(size = 44.dp)
                             Text(
                                 text = "Gestify",
                                 style = MaterialTheme.typography.headlineMedium.copy(
                                     fontFamily = FontFamily.Cursive,
-                                    fontSize = 48.sp,
-                                    lineHeight = 54.sp,
+                                    fontSize = 44.sp,
+                                    lineHeight = 50.sp,
                                     letterSpacing = 0.sp,
                                     brush = Brush.linearGradient(listOf(colors.primary, colors.secondary))
                                 ),
@@ -198,17 +206,16 @@ fun AuthScreen(
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(
                                 text = if (isLoginMode) "Bienvenido de nuevo" else "Crea tu cuenta",
-                                style = MaterialTheme.typography.headlineMedium,
+                                style = MaterialTheme.typography.headlineSmall,
                                 color = colors.onSurface
                             )
                             Text(
                                 text = if (isLoginMode) "Acceso a tu Inventario" else "Registra tu Emprendimiento",
-                                style = MaterialTheme.typography.bodyLarge,
+                                style = MaterialTheme.typography.bodyMedium,
                                 color = colors.onSurfaceVariant
                             )
                         }
 
-                        // Muestra un mensaje de error si el servidor devuelve fallo
                         viewModel.errorMessage?.let { error ->
                             Surface(
                                 color = colors.errorContainer,
@@ -224,16 +231,14 @@ fun AuthScreen(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(4.dp))
-
                         if (!isLoginMode) {
                             OutlinedTextField(
                                 value = businessName,
-                                onValueChange = { businessName = it },
-                                label = { Text("Nombre del Negocio / Tienda") },
-                                isError = showErrors && !businessValid,
-                                supportingText = if (showErrors && !businessValid) {
-                                    { Text("Escribe el nombre de tu negocio") }
+                                onValueChange = { if (it.length <= 60) businessName = it },
+                                label = { Text("Nombre del Negocio / Tienda *") },
+                                isError = showErrors && businessError != null,
+                                supportingText = if (showErrors && businessError != null) {
+                                    { Text(businessError) }
                                 } else null,
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(12.dp),
@@ -243,12 +248,14 @@ fun AuthScreen(
 
                         OutlinedTextField(
                             value = email,
-                            onValueChange = { email = it },
-                            label = { Text("Correo Electrónico") },
-                            isError = showErrors && !emailValid,
-                            supportingText = if (showErrors && !emailValid) {
-                                { Text("Ingresa un correo válido, por ejemplo nombre@correo.com") }
+                            onValueChange = { email = it.trim().lowercase() },
+                            label = { Text("Correo Electrónico *") },
+                            placeholder = { Text("ejemplo@gmail.com") },
+                            isError = showErrors && emailError != null,
+                            supportingText = if (showErrors && emailError != null) {
+                                { Text(emailError) }
                             } else null,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
                             singleLine = true
@@ -256,12 +263,14 @@ fun AuthScreen(
 
                         OutlinedTextField(
                             value = password,
-                            onValueChange = { password = it },
-                            label = { Text("Contraseña") },
-                            isError = showErrors && !passwordValid,
-                            supportingText = if (showErrors && !passwordValid) {
-                                { Text("La contraseña debe tener al menos 6 caracteres") }
-                            } else null,
+                            onValueChange = { if (it.length <= 40) password = it },
+                            label = { Text("Contraseña *") },
+                            isError = showErrors && passwordError != null,
+                            supportingText = if (showErrors && passwordError != null) {
+                                { Text(passwordError) }
+                            } else {
+                                { Text("Mínimo 6 caracteres y al menos un número") }
+                            },
                             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                             trailingIcon = {
                                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
@@ -276,19 +285,15 @@ fun AuthScreen(
                             singleLine = true
                         )
 
-                        Spacer(modifier = Modifier.height(4.dp))
-
                         Button(
                             onClick = {
                                 showErrors = true
-                                if (emailValid && passwordValid && businessValid) {
+                                if (isFormValid) {
                                     if (isLoginMode) {
-                                        // Conexión real al login del backend en Render
                                         viewModel.login(email.trim(), password) {
                                             onLoginSuccess()
                                         }
                                     } else {
-                                        // Conexión real al registro del backend en Render
                                         viewModel.register(businessName.trim(), email.trim(), password) {
                                             onLoginSuccess()
                                         }
@@ -301,7 +306,7 @@ fun AuthScreen(
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = colors.primary),
                             elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp),
-                            enabled = !viewModel.isLoading // Deshabilita el botón mientras carga
+                            enabled = !viewModel.isLoading
                         ) {
                             if (viewModel.isLoading) {
                                 CircularProgressIndicator(

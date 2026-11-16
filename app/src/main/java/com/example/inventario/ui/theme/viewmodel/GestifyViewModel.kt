@@ -1,7 +1,6 @@
 package com.example.inventario.ui.theme.viewmodel
 
 import android.app.Application
-import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -23,7 +22,6 @@ class GestifyViewModel(application: Application) : AndroidViewModel(application)
     private val authRepository = AuthRepository(application)
     private val repository = GestifyRepository(application)
 
-    // Estados de UI reactivos
     private val _products = MutableStateFlow<List<Product>>(emptyList())
     val products: StateFlow<List<Product>> = _products.asStateFlow()
 
@@ -39,10 +37,13 @@ class GestifyViewModel(application: Application) : AndroidViewModel(application)
         private set
 
     init {
-        // Cargar datos al iniciar si ya hay sesión activa
         if (authRepository.getBusinessId() != -1L) {
             refreshAllData()
         }
+    }
+
+    fun clearError() {
+        errorMessage = null
     }
 
     fun refreshAllData() {
@@ -95,13 +96,13 @@ class GestifyViewModel(application: Application) : AndroidViewModel(application)
         _suppliers.value = emptyList()
     }
 
-    // --- Productos con soporte de Cloudinary ---
+    // --- Productos (Crear o Editar + Cloudinary) ---
     fun createProductWithImage(product: Product, imageFile: File?, onSuccess: () -> Unit) {
         viewModelScope.launch {
             isLoading = true
+            errorMessage = null
             var finalImageUrl = product.imageUri
 
-            // Si se seleccionó un archivo local, lo subimos primero a Cloudinary
             if (imageFile != null) {
                 val uploadedUrl = CloudinaryService.uploadImage(imageFile)
                 if (uploadedUrl != null) {
@@ -110,13 +111,21 @@ class GestifyViewModel(application: Application) : AndroidViewModel(application)
             }
 
             val productToSave = product.copy(imageUri = finalImageUrl)
-            val success = repository.createProduct(productToSave)
-            if (success) {
-                refreshAllData()
-                onSuccess()
+            val result = if (productToSave.id == 0) {
+                repository.createProduct(productToSave)
             } else {
-                errorMessage = "No se pudo guardar el producto"
+                repository.updateProduct(productToSave)
             }
+
+            result.fold(
+                onSuccess = {
+                    refreshAllData()
+                    onSuccess()
+                },
+                onFailure = {
+                    errorMessage = it.localizedMessage ?: "No se pudo guardar el producto"
+                }
+            )
             isLoading = false
         }
     }
@@ -133,26 +142,40 @@ class GestifyViewModel(application: Application) : AndroidViewModel(application)
     fun createSale(sale: SaleItem, onSuccess: () -> Unit) {
         viewModelScope.launch {
             isLoading = true
-            if (repository.createSale(sale)) {
-                refreshAllData()
-                onSuccess()
-            } else {
-                errorMessage = "Error al registrar la venta (verifique stock)"
-            }
+            errorMessage = null
+            val result = repository.createSale(sale)
+            result.fold(
+                onSuccess = {
+                    refreshAllData()
+                    onSuccess()
+                },
+                onFailure = {
+                    errorMessage = it.localizedMessage ?: "Error al registrar la venta"
+                }
+            )
             isLoading = false
         }
     }
 
-    // --- Proveedores ---
+    // --- Proveedores (Crear o Editar) ---
     fun createSupplier(supplier: Supplier, onSuccess: () -> Unit) {
         viewModelScope.launch {
             isLoading = true
-            if (repository.createSupplier(supplier)) {
-                refreshAllData()
-                onSuccess()
+            errorMessage = null
+            val result = if (supplier.id == 0) {
+                repository.createSupplier(supplier)
             } else {
-                errorMessage = "Error al registrar proveedor"
+                repository.updateSupplier(supplier)
             }
+            result.fold(
+                onSuccess = {
+                    refreshAllData()
+                    onSuccess()
+                },
+                onFailure = {
+                    errorMessage = it.localizedMessage ?: "Error al guardar proveedor"
+                }
+            )
             isLoading = false
         }
     }
