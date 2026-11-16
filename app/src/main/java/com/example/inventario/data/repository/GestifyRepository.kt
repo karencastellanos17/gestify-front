@@ -22,7 +22,7 @@ class GestifyRepository(context: Context) {
         try {
             val response = api.getProducts(businessId)
             if (response.isSuccessful) response.body() ?: emptyList() else emptyList()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             emptyList()
         }
     }
@@ -63,7 +63,7 @@ class GestifyRepository(context: Context) {
     suspend fun toggleProduct(id: Int): Boolean = withContext(Dispatchers.IO) {
         try {
             api.toggleProduct(id).isSuccessful
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -73,7 +73,7 @@ class GestifyRepository(context: Context) {
         try {
             val response = api.getSales(businessId)
             if (response.isSuccessful) response.body() ?: emptyList() else emptyList()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             emptyList()
         }
     }
@@ -101,7 +101,7 @@ class GestifyRepository(context: Context) {
         try {
             val response = api.getSuppliers(businessId)
             if (response.isSuccessful) response.body() ?: emptyList() else emptyList()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             emptyList()
         }
     }
@@ -142,7 +142,7 @@ class GestifyRepository(context: Context) {
     suspend fun toggleSupplier(id: Int): Boolean = withContext(Dispatchers.IO) {
         try {
             api.toggleSupplier(id).isSuccessful
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -152,7 +152,7 @@ class GestifyRepository(context: Context) {
         try {
             val response = api.updatePreferences(businessId, PreferencesRequest(themeColor, isDarkMode))
             response.isSuccessful
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
