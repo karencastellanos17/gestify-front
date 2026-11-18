@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -31,6 +32,8 @@ fun ModernDialog(
     content: @Composable ColumnScope.() -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
+    val maxDialogHeight = (LocalConfiguration.current.screenHeightDp * 0.88f).dp
+
     val headerBrush = if (danger)
         Brush.linearGradient(listOf(colors.error, colors.error.copy(alpha = 0.75f)))
     else
@@ -44,8 +47,9 @@ fun ModernDialog(
     ) {
         Card(
             modifier = modifier
-                .width(520.dp)
-                .heightIn(max = 660.dp),
+                .fillMaxWidth(0.94f)
+                .widthIn(max = 520.dp)
+                .heightIn(max = maxDialogHeight),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = colors.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
@@ -65,13 +69,13 @@ fun ModernDialog(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(24.dp),
+                            .padding(horizontal = 20.dp, vertical = 18.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(48.dp)
+                                .size(44.dp)
                                 .background(onHeader.copy(alpha = 0.20f), RoundedCornerShape(14.dp)),
                             contentAlignment = Alignment.Center
                         ) {
@@ -79,7 +83,7 @@ fun ModernDialog(
                                 imageVector = icon,
                                 contentDescription = null,
                                 tint = onHeader,
-                                modifier = Modifier.size(26.dp)
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                         Column(modifier = Modifier.weight(1f)) {
@@ -114,7 +118,7 @@ fun ModernDialog(
                     Column(
                         modifier = Modifier
                             .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 24.dp, vertical = 20.dp),
+                            .padding(horizontal = 20.dp, vertical = 18.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                         content = content
                     )
@@ -126,7 +130,7 @@ fun ModernDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 16.dp),
+                        .padding(horizontal = 20.dp, vertical = 14.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
                     verticalAlignment = Alignment.CenterVertically
                 ) {

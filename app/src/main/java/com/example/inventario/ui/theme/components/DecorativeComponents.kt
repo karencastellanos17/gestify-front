@@ -126,8 +126,9 @@ fun GestifyMark(
 }
 
 /**
- * Banner de cabecera de módulo: degradado del tema, figuras decorativas,
- * ícono, título, subtítulo y (opcional) un botón de acción a la derecha.
+ * Banner de cabecera de módulo responsivo:
+ * En pantallas angostas (< 520dp) apila el encabezado arriba y los botones abajo
+ * para que el título nunca se aplaste letra por letra.
  */
 @Composable
 fun ModuleBanner(
@@ -139,56 +140,110 @@ fun ModuleBanner(
 ) {
     val colors = MaterialTheme.colorScheme
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
             .background(Brush.linearGradient(listOf(colors.primary, colors.secondary)))
     ) {
+        val isCompact = maxWidth < 540.dp
+
         BrandBackdrop(
             modifier = Modifier.matchParentSize(),
             tint = colors.onPrimary,
             scale = 0.5f
         )
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 28.dp, vertical = 22.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .background(colors.onPrimary.copy(alpha = 0.20f), RoundedCornerShape(16.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = colors.onPrimary,
-                    modifier = Modifier.size(30.dp)
-                )
-            }
-
+        if (isCompact) {
             Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = colors.onPrimary
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = colors.onPrimary.copy(alpha = 0.9f)
-                )
-            }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .background(colors.onPrimary.copy(alpha = 0.20f), RoundedCornerShape(14.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = colors.onPrimary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
 
-            if (action != null) action()
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.onPrimary
+                        )
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.onPrimary.copy(alpha = 0.9f)
+                        )
+                    }
+                }
+
+                if (action != null) {
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        action()
+                    }
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 28.dp, vertical = 22.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .background(colors.onPrimary.copy(alpha = 0.20f), RoundedCornerShape(16.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = colors.onPrimary,
+                        modifier = Modifier.size(30.dp)
+                    )
+                }
+
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = colors.onPrimary
+                    )
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = colors.onPrimary.copy(alpha = 0.9f)
+                    )
+                }
+
+                if (action != null) action()
+            }
         }
     }
 }

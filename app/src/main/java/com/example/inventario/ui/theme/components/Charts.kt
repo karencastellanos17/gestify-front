@@ -1,6 +1,5 @@
 package com.example.inventario.ui.theme.components
 
-
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -19,6 +18,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
@@ -90,7 +90,9 @@ fun SalesBarChart(
                         text = "$" + compactNumber(value),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
-                        color = colors.primary
+                        color = colors.primary,
+                        maxLines = 1,
+                        softWrap = false
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Box(
@@ -116,7 +118,7 @@ fun SalesBarChart(
     }
 }
 
-/** Gráfico de dona animado: lista de (categoría, unidades) con leyenda. */
+/** Gráfico de dona animado responsivo: coloca la leyenda abajo si la tarjeta es angosta. */
 @Composable
 fun StockDonutChart(
     data: List<Pair<String, Int>>,
@@ -151,72 +153,137 @@ fun StockDonutChart(
 
     val total = data.sumOf { it.second }.coerceAtLeast(1)
 
-    Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(20.dp)
-    ) {
-        Box(modifier = Modifier.size(160.dp), contentAlignment = Alignment.Center) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val strokeWidth = 26.dp.toPx()
-                val inset = strokeWidth / 2f
-                val arcSize = Size(size.width - strokeWidth, size.height - strokeWidth)
-                val gap = if (data.size > 1) 3f else 0f
-                var start = -90f
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val stackVertically = maxWidth < 330.dp
+        val donutSize = if (stackVertically) 136.dp else 160.dp
 
-                data.forEachIndexed { index, item ->
-                    val sweep = 360f * item.second / total * progress.value
-                    drawArc(
-                        color = sliceColors[index % sliceColors.size],
-                        startAngle = start,
-                        sweepAngle = (sweep - gap).coerceAtLeast(0.1f),
-                        useCenter = false,
-                        topLeft = Offset(inset, inset),
-                        size = arcSize,
-                        style = Stroke(width = strokeWidth)
-                    )
-                    start += sweep
-                }
-            }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "$total",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.onSurface
+        if (stackVertically) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                DonutRing(
+                    data = data,
+                    total = total,
+                    progress = progress.value,
+                    sliceColors = sliceColors,
+                    donutSize = donutSize
                 )
-                Text(
-                    text = "UNIDADES",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colors.onSurfaceVariant
+                DonutLegend(
+                    data = data,
+                    sliceColors = sliceColors,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(18.dp)
+            ) {
+                DonutRing(
+                    data = data,
+                    total = total,
+                    progress = progress.value,
+                    sliceColors = sliceColors,
+                    donutSize = donutSize
+                )
+                DonutLegend(
+                    data = data,
+                    sliceColors = sliceColors,
+                    modifier = Modifier.weight(1f)
                 )
             }
         }
+    }
+}
 
-        // Leyenda
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+@Composable
+private fun DonutRing(
+    data: List<Pair<String, Int>>,
+    total: Int,
+    progress: Float,
+    sliceColors: List<Color>,
+    donutSize: Dp
+) {
+    val colors = MaterialTheme.colorScheme
+    Box(modifier = Modifier.size(donutSize), contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val strokeWidth = 24.dp.toPx()
+            val inset = strokeWidth / 2f
+            val arcSize = Size(size.width - strokeWidth, size.height - strokeWidth)
+            val gap = if (data.size > 1) 3f else 0f
+            var start = -90f
+
             data.forEachIndexed { index, item ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .background(sliceColors[index % sliceColors.size], CircleShape)
-                    )
-                    Text(
-                        text = item.first,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.onSurface
-                    )
-                    Text(
-                        text = "${item.second} un.",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = colors.onSurfaceVariant
-                    )
-                }
+                val sweep = 360f * item.second / total * progress
+                drawArc(
+                    color = sliceColors[index % sliceColors.size],
+                    startAngle = start,
+                    sweepAngle = (sweep - gap).coerceAtLeast(0.1f),
+                    useCenter = false,
+                    topLeft = Offset(inset, inset),
+                    size = arcSize,
+                    style = Stroke(width = strokeWidth)
+                )
+                start += sweep
+            }
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "$total",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = colors.onSurface
+            )
+            Text(
+                text = "UNIDADES",
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun DonutLegend(
+    data: List<Pair<String, Int>>,
+    sliceColors: List<Color>,
+    modifier: Modifier = Modifier
+) {
+    val colors = MaterialTheme.colorScheme
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        data.forEachIndexed { index, item ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .background(sliceColors[index % sliceColors.size], CircleShape)
+                )
+                Text(
+                    text = item.first,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = "${item.second} un.",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.onSurfaceVariant,
+                    maxLines = 1,
+                    softWrap = false
+                )
             }
         }
     }

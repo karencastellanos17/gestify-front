@@ -9,7 +9,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.List
@@ -83,14 +85,20 @@ fun MainScreen(
     val products by viewModel.products.collectAsState()
     val suppliers by viewModel.suppliers.collectAsState()
 
-    val screenWidth = LocalConfiguration.current.screenWidthDp
-    val isPhone = screenWidth < 700
-    val compactMenu = screenWidth < 1100
+    val config = LocalConfiguration.current
+    val screenWidth = config.screenWidthDp
+    val screenHeight = config.screenHeightDp
+
+    // Celular vertical (< 600dp de ancho) -> Barra superior + Barra inferior
+    // Celular horizontal (ancho >= 600dp y alto < 500dp) o Tablet -> Barra lateral con scroll
+    val isPortraitPhone = screenWidth < 600
+    val isLandscapePhone = !isPortraitPhone && screenHeight < 500
+    val compactMenu = screenWidth < 1100 || isLandscapePhone
 
     InventarioTheme(selectedColor = currentThemeColor, darkTheme = isDarkMode) {
         val colors = MaterialTheme.colorScheme
 
-        if (isPhone) {
+        if (isPortraitPhone) {
             Scaffold(
                 modifier = Modifier.fillMaxSize(),
                 topBar = {
@@ -217,13 +225,15 @@ fun MainScreen(
                     .fillMaxSize()
                     .background(colors.background)
                     .statusBarsPadding()
+                    .navigationBarsPadding()
             ) {
                 GestifySidebar(
                     selectedTab = selectedTab,
                     onSelect = { selectedTab = it },
                     isDarkMode = isDarkMode,
                     onDarkModeChange = { changeDarkMode(it) },
-                    compact = compactMenu
+                    compact = compactMenu,
+                    shortScreen = isLandscapePhone
                 )
 
                 if (isDarkMode) {
@@ -250,7 +260,7 @@ fun MainScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(24.dp),
+                            .padding(if (isLandscapePhone) 8.dp else 24.dp),
                         contentAlignment = Alignment.TopStart
                     ) {
                         ScreenContent(
@@ -409,7 +419,8 @@ private fun GestifySidebar(
     onSelect: (Int) -> Unit,
     isDarkMode: Boolean,
     onDarkModeChange: (Boolean) -> Unit,
-    compact: Boolean
+    compact: Boolean,
+    shortScreen: Boolean = false
 ) {
     val colors = MaterialTheme.colorScheme
     val palette = sidebarPalette(isDarkMode)
@@ -419,7 +430,11 @@ private fun GestifySidebar(
     val current = allItems[position]
 
     val width by animateDpAsState(
-        targetValue = if (compact) 84.dp else 232.dp,
+        targetValue = when {
+            shortScreen -> 72.dp
+            compact -> 84.dp
+            else -> 232.dp
+        },
         animationSpec = tween(durationMillis = 300),
         label = "SidebarWidth"
     )
@@ -491,13 +506,20 @@ private fun GestifySidebar(
             )
         }
 
+        val scrollState = rememberScrollState()
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = if (compact) 18.dp else 14.dp, vertical = 20.dp)
+                .verticalScroll(scrollState)
+                .padding(
+                    horizontal = if (shortScreen) 12.dp else if (compact) 18.dp else 14.dp,
+                    vertical = if (shortScreen) 10.dp else 20.dp
+                ),
+            horizontalAlignment = if (compact) Alignment.CenterHorizontally else Alignment.Start
         ) {
             if (compact) {
-                GestifyMark(size = 48.dp, onGradient = !isDarkMode)
+                GestifyMark(size = if (shortScreen) 40.dp else 48.dp, onGradient = !isDarkMode)
             } else {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -525,7 +547,7 @@ private fun GestifySidebar(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(if (shortScreen) 10.dp else 20.dp))
 
             if (!compact) {
                 Surface(
@@ -577,38 +599,50 @@ private fun GestifySidebar(
                 Spacer(modifier = Modifier.height(20.dp))
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(if (shortScreen) 4.dp else 6.dp)) {
                 topNavItems.forEach { entry ->
                     SidebarItem(
                         entry = entry,
                         isSelected = selectedTab == entry.tab,
                         compact = compact,
+                        shortScreen = shortScreen,
                         palette = palette,
                         onClick = { onSelect(entry.tab) }
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            if (shortScreen) {
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(
+                    color = palette.content.copy(alpha = 0.25f),
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            } else {
+                Spacer(modifier = Modifier.height(16.dp))
+            }
 
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(if (shortScreen) 4.dp else 6.dp)) {
                 bottomNavItems.forEach { entry ->
                     SidebarItem(
                         entry = entry,
                         isSelected = selectedTab == entry.tab,
                         compact = compact,
+                        shortScreen = shortScreen,
                         palette = palette,
                         onClick = { onSelect(entry.tab) }
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(if (shortScreen) 6.dp else 10.dp))
 
             DarkModeToggle(
                 isDarkMode = isDarkMode,
                 onChange = onDarkModeChange,
                 compact = compact,
+                shortScreen = shortScreen,
                 palette = palette
             )
         }
@@ -620,6 +654,7 @@ private fun SidebarItem(
     entry: NavEntry,
     isSelected: Boolean,
     compact: Boolean,
+    shortScreen: Boolean = false,
     palette: SidebarPalette,
     onClick: () -> Unit
 ) {
@@ -639,10 +674,13 @@ private fun SidebarItem(
         label = "ItemIconTint"
     )
 
+    val boxSize = if (shortScreen) 30.dp else 34.dp
+    val iconSize = if (shortScreen) 18.dp else 20.dp
+
     val iconBox: @Composable () -> Unit = {
         Box(
             modifier = Modifier
-                .size(34.dp)
+                .size(boxSize)
                 .background(iconBackground, RoundedCornerShape(10.dp)),
             contentAlignment = Alignment.Center
         ) {
@@ -650,7 +688,7 @@ private fun SidebarItem(
                 imageVector = entry.icon,
                 contentDescription = entry.label,
                 tint = iconTint,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(iconSize)
             )
         }
     }
@@ -658,7 +696,7 @@ private fun SidebarItem(
     if (compact) {
         Box(
             modifier = Modifier
-                .size(48.dp)
+                .size(if (shortScreen) 42.dp else 48.dp)
                 .clip(RoundedCornerShape(14.dp))
                 .background(background)
                 .clickable(onClick = onClick),
@@ -707,6 +745,7 @@ private fun DarkModeToggle(
     isDarkMode: Boolean,
     onChange: (Boolean) -> Unit,
     compact: Boolean,
+    shortScreen: Boolean = false,
     palette: SidebarPalette
 ) {
     val colors = MaterialTheme.colorScheme
@@ -714,7 +753,7 @@ private fun DarkModeToggle(
     if (compact) {
         Box(
             modifier = Modifier
-                .size(48.dp)
+                .size(if (shortScreen) 42.dp else 48.dp)
                 .clip(RoundedCornerShape(14.dp))
                 .background(palette.chipBackground)
                 .clickable { onChange(!isDarkMode) },
@@ -724,7 +763,7 @@ private fun DarkModeToggle(
                 imageVector = if (isDarkMode) Icons.Default.DarkMode else Icons.Default.LightMode,
                 contentDescription = "Cambiar entre modo claro y oscuro",
                 tint = palette.content,
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(if (shortScreen) 20.dp else 22.dp)
             )
         }
     } else {
