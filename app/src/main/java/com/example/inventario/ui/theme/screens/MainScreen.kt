@@ -19,8 +19,10 @@ import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.InsertChart
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
@@ -56,7 +58,9 @@ private val topNavItems = listOf(
     NavEntry(1, "Stock", "Tus productos e inventario", Icons.AutoMirrored.Filled.List),
     NavEntry(2, "Ventas", "Caja y transacciones", Icons.Default.ShoppingCart),
     NavEntry(3, "Alertas", "Stock bajo y pedidos", Icons.Default.Info),
-    NavEntry(5, "Proveedores", "Quién te surte cada producto", Icons.Default.LocalShipping)
+    NavEntry(5, "Proveedores", "Quién te surte cada producto", Icons.Default.LocalShipping),
+    NavEntry(8, "Gastos", "Egresos y compras de la tienda", Icons.Default.ReceiptLong),
+    NavEntry(7, "Reportes", "Hojas de cálculo y balance", Icons.Default.InsertChart)
 )
 
 private val bottomNavItems = listOf(
@@ -360,6 +364,8 @@ private fun ScreenContent(
                     )
                     5 -> SuppliersScreen()
                     6 -> AboutScreen()
+                    7 -> ReportsScreen()
+                    8 -> ExpensesScreen() // <--- RUTA DE GASTOS INTEGRADA
                 }
             }
         }

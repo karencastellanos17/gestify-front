@@ -1,6 +1,7 @@
 package com.example.inventario.data.remote
 
 import com.example.inventario.data.model.CreateSupplierOrderRequest
+import com.example.inventario.data.model.Expense
 import com.example.inventario.data.model.Product
 import com.example.inventario.data.model.Supplier
 import com.example.inventario.data.model.SupplierOrder
@@ -80,4 +81,11 @@ interface GestifyApi {
 
     @PUT("api/businesses/me/preferences")
     suspend fun updatePreferences(@Body preferences: PreferencesRequest): Response<Unit>
+
+    // --- ENDPOINTS DE GASTOS CONECTADOS AL BACKEND ---
+    @GET("api/expenses")
+    suspend fun getExpenses(): Response<List<Expense>>
+
+    @POST("api/expenses")
+    suspend fun createExpense(@Body expense: Expense): Response<Expense>
 }

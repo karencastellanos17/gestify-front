@@ -2,6 +2,7 @@ package com.example.inventario.data.repository
 
 import android.content.Context
 import com.example.inventario.data.model.CreateSupplierOrderRequest
+import com.example.inventario.data.model.Expense
 import com.example.inventario.data.model.Product
 import com.example.inventario.data.model.Supplier
 import com.example.inventario.data.model.SupplierOrder
@@ -74,6 +75,13 @@ class GestifyRepository(@Suppress("UNUSED_PARAMETER") context: Context) {
 
     suspend fun receiveSupplierOrder(id: Int): Result<Unit> =
         execute { api.receiveSupplierOrder(id) }.map { }
+
+    // --- MÉTODOS DE GASTOS EN EL REPOSITORIO ---
+    suspend fun getExpenses(): Result<List<Expense>> =
+        execute { api.getExpenses() }.map { it.orEmpty() }
+
+    suspend fun createExpense(expense: Expense): Result<Unit> =
+        execute { api.createExpense(expense) }.map { }
 
     suspend fun updatePreferences(themeColor: String, isDarkMode: Boolean): Result<Unit> =
         execute { api.updatePreferences(PreferencesRequest(themeColor, isDarkMode)) }.map { }

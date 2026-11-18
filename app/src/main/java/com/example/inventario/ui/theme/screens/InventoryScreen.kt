@@ -90,7 +90,7 @@ fun InventoryScreen(
     ) {
         ModuleBanner(
             title = "Control de Inventario y Stock",
-            subtitle = "Gestión de productos conectada al backend con Cloudinary.",
+            subtitle = "Gestión de productos con código SKU automático y Cloudinary.",
             icon = Icons.Default.Inventory2,
             action = {
                 Button(
@@ -244,7 +244,6 @@ fun InventoryScreen(
                                 .height(260.dp)
                         )
                     } else if (isGalleryView) {
-                        // Cuadrícula adaptable: 2 columnas en celular, 2 en tablet, 3 en PC (evita tarjetas gigantes en cascada)
                         val columns = when {
                             isPhone -> 2
                             isTablet -> 2
@@ -276,7 +275,6 @@ fun InventoryScreen(
                             }
                         }
                     } else if (isPhone) {
-                        // Vista Lista en celular: tarjeta horizontal compacta con foto cuadrada 64x64
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             products.forEach { product ->
                                 ProductMobileListCard(
@@ -300,13 +298,14 @@ fun InventoryScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                TableHeaderCell("ID", modifier = Modifier.weight(0.6f))
-                                TableHeaderCell("PRODUCTO", modifier = Modifier.weight(2.2f))
-                                TableHeaderCell("CATEGORÍA", modifier = Modifier.weight(1.5f))
-                                TableHeaderCell("PRECIO", modifier = Modifier.weight(1.1f))
-                                TableHeaderCell("STOCK", modifier = Modifier.weight(1f))
-                                TableHeaderCell("ESTADO", modifier = Modifier.weight(1.2f))
-                                TableHeaderCell("ACCIONES", modifier = Modifier.weight(1.3f))
+                                TableHeaderCell("ID", modifier = Modifier.weight(0.5f))
+                                TableHeaderCell("SKU", modifier = Modifier.weight(1.2f))
+                                TableHeaderCell("PRODUCTO", modifier = Modifier.weight(2.0f))
+                                TableHeaderCell("CATEGORÍA", modifier = Modifier.weight(1.3f))
+                                TableHeaderCell("PRECIO", modifier = Modifier.weight(1.0f))
+                                TableHeaderCell("STOCK", modifier = Modifier.weight(0.9f))
+                                TableHeaderCell("ESTADO", modifier = Modifier.weight(1.1f))
+                                TableHeaderCell("ACCIONES", modifier = Modifier.weight(1.2f))
                             }
 
                             Spacer(modifier = Modifier.height(8.dp))
@@ -421,10 +420,6 @@ fun InventoryScreen(
     }
 }
 
-/**
- * Recorta la imagen al centro en formato cuadrado 1:1 (máximo 900x900 px) antes de subirla a Cloudinary,
- * asegurando que se encuadre igual en celular, tablet y escritorio.
- */
 private fun uriToSquareFile(context: Context, uri: Uri): File? {
     return try {
         val original = context.contentResolver.openInputStream(uri)?.use {
@@ -693,14 +688,33 @@ private fun ProductMobileListCard(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text(
-                    text = product.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = product.name,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = colors.primary.copy(alpha = 0.10f)
+                    ) {
+                        Text(
+                            text = product.sku.ifBlank { "GEN-01" },
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.primary,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
                 Text(
                     text = "${product.category} · ${product.stock} un.",
                     style = MaterialTheme.typography.bodySmall,
@@ -754,22 +768,38 @@ private fun ProductTableRow(
         ) {
             Text(
                 "#${product.id}",
-                modifier = Modifier.weight(0.6f),
+                modifier = Modifier.weight(0.5f),
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.onSurfaceVariant
             )
 
+            Surface(
+                modifier = Modifier.weight(1.2f),
+                shape = RoundedCornerShape(6.dp),
+                color = colors.primary.copy(alpha = 0.10f)
+            ) {
+                Text(
+                    text = product.sku.ifBlank { "GEN-01" },
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
             Row(
-                modifier = Modifier.weight(2.2f),
+                modifier = Modifier.weight(2.0f),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 ProductImage(
                     imageUri = product.imageUri,
                     fallbackLabel = product.name.take(1).uppercase(),
                     modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(10.dp))
                         .alpha(if (product.isActive) 1f else 0.5f)
                 )
                 Text(
@@ -782,13 +812,13 @@ private fun ProductTableRow(
                 )
             }
 
-            Box(modifier = Modifier.weight(1.5f)) {
+            Box(modifier = Modifier.weight(1.3f)) {
                 CategoryTag(name = product.category)
             }
 
             Text(
                 "$${String.format(Locale.US, "%,.0f", product.price)}",
-                modifier = Modifier.weight(1.1f),
+                modifier = Modifier.weight(1.0f),
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Bold,
                 color = colors.primary
@@ -796,13 +826,13 @@ private fun ProductTableRow(
 
             Text(
                 "${product.stock} un.",
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(0.9f),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = if (product.stock < 5) FontWeight.Bold else FontWeight.Normal,
                 color = if (product.stock < 5) colors.error else colors.onSurface
             )
 
-            Box(modifier = Modifier.weight(1.2f)) {
+            Box(modifier = Modifier.weight(1.1f)) {
                 if (product.isActive) {
                     StatusBadge(text = "Activo", style = StatusBadgeStyle.SUCCESS)
                 } else {
@@ -811,8 +841,8 @@ private fun ProductTableRow(
             }
 
             Row(
-                modifier = Modifier.weight(1.3f),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.weight(1.2f),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 EditActionButton(onClick = onEditRequest)
                 ToggleActionButton(isActive = product.isActive, onClick = onToggleRequest)
@@ -913,14 +943,33 @@ private fun ProductGalleryCard(
                 modifier = Modifier.padding(if (compact) 10.dp else 14.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Text(
-                    text = product.name,
-                    style = if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = product.name,
+                        style = if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = colors.primary.copy(alpha = 0.10f)
+                    ) {
+                        Text(
+                            text = product.sku.ifBlank { "GEN-01" },
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.primary,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),

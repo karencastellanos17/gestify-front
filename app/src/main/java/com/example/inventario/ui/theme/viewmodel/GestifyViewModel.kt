@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.inventario.data.model.CreateSupplierOrderRequest
+import com.example.inventario.data.model.Expense
 import com.example.inventario.data.model.Product
 import com.example.inventario.data.model.Supplier
 import com.example.inventario.data.model.SupplierOrder
@@ -37,6 +38,9 @@ class GestifyViewModel(application: Application) : AndroidViewModel(application)
 
     private val _supplierOrders = MutableStateFlow<List<SupplierOrder>>(emptyList())
     val supplierOrders: StateFlow<List<SupplierOrder>> = _supplierOrders.asStateFlow()
+
+    private val _expenses = MutableStateFlow<List<Expense>>(emptyList())
+    val expenses: StateFlow<List<Expense>> = _expenses.asStateFlow()
 
     var isLoading by mutableStateOf(false)
         private set
@@ -132,6 +136,7 @@ class GestifyViewModel(application: Application) : AndroidViewModel(application)
         _sales.value = emptyList()
         _suppliers.value = emptyList()
         _supplierOrders.value = emptyList()
+        _expenses.value = emptyList()
         errorMessage = null
         syncError = null
         isLoading = false
@@ -256,6 +261,17 @@ class GestifyViewModel(application: Application) : AndroidViewModel(application)
             )
             isLoading = false
         }
+    }
+
+    fun addExpense(concept: String, amount: Double, imageUri: String?) {
+        val current = _expenses.value
+        val newId = (current.maxOfOrNull { it.id } ?: 0) + 1
+        _expenses.value = current + Expense(
+            id = newId,
+            concept = concept,
+            amount = amount,
+            imageUri = imageUri
+        )
     }
 
     fun savedThemeColor(): String = authRepository.getThemeColor()

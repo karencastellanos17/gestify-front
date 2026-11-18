@@ -1,5 +1,7 @@
 package com.example.inventario.ui.theme.screens
 
+import android.content.Context
+import android.content.Intent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -13,17 +15,21 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.inventario.ui.theme.Temas.AmberPrimary
 import com.example.inventario.ui.theme.Temas.AmberSecondary
@@ -44,6 +50,7 @@ import com.example.inventario.ui.theme.components.StatusBadgeStyle
 import com.example.inventario.ui.theme.components.WaveFooter
 import com.example.inventario.ui.theme.viewmodel.GestifyViewModel
 import com.example.inventario.utils.AppThemeColor
+import java.io.File
 
 private data class ThemeOption(
     val title: String,
@@ -61,6 +68,8 @@ fun SettingsScreen(
     viewModel: GestifyViewModel = viewModel()
 ) {
     val colors = MaterialTheme.colorScheme
+    val context = LocalContext.current
+    val sales by viewModel.sales.collectAsState()
     val isPhone = LocalConfiguration.current.screenWidthDp < 700
 
     fun handleColorSelection(color: AppThemeColor) {
@@ -86,9 +95,63 @@ fun SettingsScreen(
     ) {
         ModuleBanner(
             title = "Configuración del Emprendimiento",
-            subtitle = "Personaliza la identidad visual de tu negocio. El color seleccionado se guarda en la nube.",
+            subtitle = "Personaliza la identidad visual de tu negocio y exporta tus reportes de ventas.",
             icon = Icons.Default.Palette
         )
+
+        // Tarjeta para Exportar Reporte
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.4f)),
+            colors = CardDefaults.cardColors(containerColor = colors.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+        ) {
+            Box {
+                WaveFooter(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(80.dp)
+                        .align(Alignment.BottomCenter),
+                    color = colors.primary.copy(alpha = 0.05f)
+                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                text = "Exportar Reporte Financiero",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = colors.primary
+                            )
+                            Text(
+                                text = "Descarga tus ventas en formato CSV compatible con Excel y Google Sheets.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = colors.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Button(
+                        onClick = { exportSalesToCsv(context, sales) },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Exportar Reporte de Ventas (CSV)", style = MaterialTheme.typography.titleSmall)
+                    }
+                }
+            }
+        }
 
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -251,6 +314,30 @@ fun SettingsScreen(
             }
         }
     }
+}
+
+// Función para exportar a CSV
+private fun exportSalesToCsv(context: Context, sales: List<com.example.inventario.ui.theme.screens.SaleItem>) {
+    val csvHeader = "ID,Producto,Cantidad,Total,Fecha\n"
+    val csvBody = sales.joinToString("\n") { sale ->
+        "${sale.id},\"${sale.productName}\",${sale.quantity},${sale.total},${sale.date}"
+    }
+
+    val file = File(context.cacheDir, "Reporte_Ventas_Gestify.csv")
+    file.writeText(csvHeader + csvBody)
+
+    val uri = FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.fileprovider",
+        file
+    )
+
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/csv"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(intent, "Compartir reporte con:"))
 }
 
 @Composable
