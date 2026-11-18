@@ -1,8 +1,10 @@
 package com.example.inventario.data.repository
 
 import android.content.Context
+import com.example.inventario.data.model.CreateSupplierOrderRequest
 import com.example.inventario.data.model.Product
 import com.example.inventario.data.model.Supplier
+import com.example.inventario.data.model.SupplierOrder
 import com.example.inventario.data.remote.ApiException
 import com.example.inventario.data.remote.GestifyApi
 import com.example.inventario.data.remote.NETWORK_ERROR_MESSAGE
@@ -63,6 +65,15 @@ class GestifyRepository(@Suppress("UNUSED_PARAMETER") context: Context) {
 
     suspend fun toggleSupplier(id: Int): Result<Unit> =
         execute { api.toggleSupplier(id) }.map { }
+
+    suspend fun getSupplierOrders(): Result<List<SupplierOrder>> =
+        execute { api.getSupplierOrders() }.map { it.orEmpty() }
+
+    suspend fun createSupplierOrder(request: CreateSupplierOrderRequest): Result<Unit> =
+        execute { api.createSupplierOrder(request) }.map { }
+
+    suspend fun receiveSupplierOrder(id: Int): Result<Unit> =
+        execute { api.receiveSupplierOrder(id) }.map { }
 
     suspend fun updatePreferences(themeColor: String, isDarkMode: Boolean): Result<Unit> =
         execute { api.updatePreferences(PreferencesRequest(themeColor, isDarkMode)) }.map { }

@@ -1,7 +1,9 @@
 package com.example.inventario.data.remote
 
+import com.example.inventario.data.model.CreateSupplierOrderRequest
 import com.example.inventario.data.model.Product
 import com.example.inventario.data.model.Supplier
+import com.example.inventario.data.model.SupplierOrder
 import com.example.inventario.ui.theme.screens.SaleItem
 import retrofit2.Response
 import retrofit2.http.*
@@ -66,6 +68,15 @@ interface GestifyApi {
 
     @PATCH("api/suppliers/{id}/toggle")
     suspend fun toggleSupplier(@Path("id") id: Int): Response<Unit>
+
+    @GET("api/supplier-orders")
+    suspend fun getSupplierOrders(): Response<List<SupplierOrder>>
+
+    @POST("api/supplier-orders")
+    suspend fun createSupplierOrder(@Body request: CreateSupplierOrderRequest): Response<SupplierOrder>
+
+    @PATCH("api/supplier-orders/{id}/receive")
+    suspend fun receiveSupplierOrder(@Path("id") id: Int): Response<SupplierOrder>
 
     @PUT("api/businesses/me/preferences")
     suspend fun updatePreferences(@Body preferences: PreferencesRequest): Response<Unit>

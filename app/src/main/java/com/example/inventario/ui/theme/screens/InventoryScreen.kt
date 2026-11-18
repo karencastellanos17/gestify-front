@@ -1,6 +1,8 @@
 package com.example.inventario.ui.theme.screens
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -66,12 +68,14 @@ fun InventoryScreen(
     val colors = MaterialTheme.colorScheme
     val context = LocalContext.current
     val products by viewModel.products.collectAsState()
-    val isPhone = LocalConfiguration.current.screenWidthDp < 700
+    val screenWidth = LocalConfiguration.current.screenWidthDp
+    val isPhone = screenWidth < 700
+    val isTablet = screenWidth in 700..1099
 
     var showAddDialog by remember { mutableStateOf(false) }
     var productToEdit by remember { mutableStateOf<Product?>(null) }
     var productToToggle by remember { mutableStateOf<Product?>(null) }
-    var isGalleryView by remember { mutableStateOf(isPhone) }
+    var isGalleryView by remember { mutableStateOf(false) }
 
     val activeCount = products.count { it.isActive }
     val lowStockCount = products.count { it.isActive && it.stock < 5 }
@@ -103,7 +107,7 @@ fun InventoryScreen(
                 ) {
                     Icon(Icons.Default.Add, contentDescription = "Agregar", modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Nuevo Producto", style = MaterialTheme.typography.titleSmall)
+                    Text("Nuevo Producto", style = MaterialTheme.typography.titleSmall, maxLines = 1, softWrap = false)
                 }
             }
         )
@@ -189,37 +193,37 @@ fun InventoryScreen(
                             text = "Catálogo de productos",
                             style = MaterialTheme.typography.titleLarge,
                             color = colors.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
                         )
 
-                        if (!isPhone) {
-                            val chipColors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = colors.primary.copy(alpha = 0.15f),
-                                selectedLabelColor = colors.primary,
-                                selectedLeadingIconColor = colors.primary
+                        val chipColors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = colors.primary.copy(alpha = 0.15f),
+                            selectedLabelColor = colors.primary,
+                            selectedLeadingIconColor = colors.primary
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(
+                                selected = !isGalleryView,
+                                onClick = { isGalleryView = false },
+                                label = { Text("Lista", maxLines = 1, softWrap = false) },
+                                leadingIcon = {
+                                    Icon(Icons.AutoMirrored.Filled.ViewList, contentDescription = null, modifier = Modifier.size(18.dp))
+                                },
+                                colors = chipColors,
+                                shape = RoundedCornerShape(50)
                             )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                FilterChip(
-                                    selected = !isGalleryView,
-                                    onClick = { isGalleryView = false },
-                                    label = { Text("Lista") },
-                                    leadingIcon = {
-                                        Icon(Icons.AutoMirrored.Filled.ViewList, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    },
-                                    colors = chipColors,
-                                    shape = RoundedCornerShape(50)
-                                )
-                                FilterChip(
-                                    selected = isGalleryView,
-                                    onClick = { isGalleryView = true },
-                                    label = { Text("Galería") },
-                                    leadingIcon = {
-                                        Icon(Icons.Default.GridView, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    },
-                                    colors = chipColors,
-                                    shape = RoundedCornerShape(50)
-                                )
-                            }
+                            FilterChip(
+                                selected = isGalleryView,
+                                onClick = { isGalleryView = true },
+                                label = { Text("Galería", maxLines = 1, softWrap = false) },
+                                leadingIcon = {
+                                    Icon(Icons.Default.GridView, contentDescription = null, modifier = Modifier.size(18.dp))
+                                },
+                                colors = chipColors,
+                                shape = RoundedCornerShape(50)
+                            )
                         }
                     }
 
@@ -239,10 +243,43 @@ fun InventoryScreen(
                                 .fillMaxWidth()
                                 .height(260.dp)
                         )
-                    } else if (isPhone || isGalleryView) {
+                    } else if (isGalleryView) {
+                        // Cuadrícula adaptable: 2 columnas en celular, 2 en tablet, 3 en PC (evita tarjetas gigantes en cascada)
+                        val columns = when {
+                            isPhone -> 2
+                            isTablet -> 2
+                            else -> 3
+                        }
+                        val rows = products.chunked(columns)
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            rows.forEach { rowProducts ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    rowProducts.forEach { product ->
+                                        ProductGalleryCard(
+                                            product = product,
+                                            compact = isPhone,
+                                            modifier = Modifier.weight(1f),
+                                            onEditRequest = {
+                                                viewModel.clearError()
+                                                productToEdit = product
+                                            },
+                                            onToggleRequest = { productToToggle = product }
+                                        )
+                                    }
+                                    repeat(columns - rowProducts.size) {
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
+                                }
+                            }
+                        }
+                    } else if (isPhone) {
+                        // Vista Lista en celular: tarjeta horizontal compacta con foto cuadrada 64x64
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             products.forEach { product ->
-                                ProductGalleryCard(
+                                ProductMobileListCard(
                                     product = product,
                                     onEditRequest = {
                                         viewModel.clearError()
@@ -305,7 +342,7 @@ fun InventoryScreen(
             onConfirm = { name, category, price, stock, imageUriString ->
                 val imageFile = imageUriString?.let { uriString ->
                     if (uriString.startsWith("content://") || uriString.startsWith("file://")) {
-                        uriToFile(context, Uri.parse(uriString))
+                        uriToSquareFile(context, Uri.parse(uriString))
                     } else null
                 }
                 val newProduct = Product(
@@ -337,7 +374,7 @@ fun InventoryScreen(
             onConfirm = { name, category, price, stock, imageUriString ->
                 val imageFile = imageUriString?.let { uriString ->
                     if (uriString.startsWith("content://") || uriString.startsWith("file://")) {
-                        uriToFile(context, Uri.parse(uriString))
+                        uriToSquareFile(context, Uri.parse(uriString))
                     } else null
                 }
                 val updatedProduct = target.copy(
@@ -345,7 +382,11 @@ fun InventoryScreen(
                     category = category,
                     price = price,
                     stock = stock,
-                    imageUri = if (imageUriString?.startsWith("http") == true) imageUriString else target.imageUri
+                    imageUri = when {
+                        imageUriString == null -> null
+                        imageUriString.startsWith("http") -> imageUriString
+                        else -> target.imageUri
+                    }
                 )
                 viewModel.createProductWithImage(updatedProduct, imageFile) {
                     productToEdit = null
@@ -380,12 +421,31 @@ fun InventoryScreen(
     }
 }
 
-private fun uriToFile(context: Context, uri: Uri): File? {
+/**
+ * Recorta la imagen al centro en formato cuadrado 1:1 (máximo 900x900 px) antes de subirla a Cloudinary,
+ * asegurando que se encuadre igual en celular, tablet y escritorio.
+ */
+private fun uriToSquareFile(context: Context, uri: Uri): File? {
     return try {
-        val inputStream = context.contentResolver.openInputStream(uri) ?: return null
+        val original = context.contentResolver.openInputStream(uri)?.use {
+            BitmapFactory.decodeStream(it)
+        } ?: return null
+
+        val side = minOf(original.width, original.height)
+        val xOffset = (original.width - side) / 2
+        val yOffset = (original.height - side) / 2
+        val cropped = Bitmap.createBitmap(original, xOffset, yOffset, side, side)
+
+        val targetSize = minOf(side, 900)
+        val scaled = if (side > targetSize) {
+            Bitmap.createScaledBitmap(cropped, targetSize, targetSize, true)
+        } else {
+            cropped
+        }
+
         val file = File(context.cacheDir, "upload_${System.currentTimeMillis()}.jpg")
-        file.outputStream().use { output ->
-            inputStream.copyTo(output)
+        file.outputStream().use { out ->
+            scaled.compress(Bitmap.CompressFormat.JPEG, 88, out)
         }
         file
     } catch (e: Exception) {
@@ -464,11 +524,11 @@ private fun ProductFormDialog(
             }
         }
 
-        DialogSection(title = "Foto del producto", icon = Icons.Default.AddPhotoAlternate) {
+        DialogSection(title = "Foto del producto (encuadre cuadrado 1:1)", icon = Icons.Default.AddPhotoAlternate) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(150.dp)
+                    .height(170.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .background(colors.primary.copy(alpha = 0.06f))
                     .border(BorderStroke(1.5.dp, colors.primary.copy(alpha = 0.4f)), RoundedCornerShape(16.dp))
@@ -479,7 +539,9 @@ private fun ProductFormDialog(
                     ProductImage(
                         imageUri = imageUri,
                         fallbackLabel = name.take(1).uppercase(),
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier
+                            .size(146.dp)
+                            .clip(RoundedCornerShape(14.dp))
                     )
                     Surface(
                         onClick = { imageUri = null },
@@ -487,7 +549,7 @@ private fun ProductFormDialog(
                             .align(Alignment.BottomStart)
                             .padding(10.dp),
                         shape = RoundedCornerShape(50),
-                        color = colors.surface.copy(alpha = 0.9f)
+                        color = colors.surface.copy(alpha = 0.92f)
                     ) {
                         Text(
                             text = "Quitar foto",
@@ -497,11 +559,12 @@ private fun ProductFormDialog(
                         )
                     }
                     Surface(
+                        onClick = { picker.launch("image/*") },
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .padding(10.dp),
                         shape = RoundedCornerShape(50),
-                        color = colors.surface.copy(alpha = 0.9f)
+                        color = colors.surface.copy(alpha = 0.92f)
                     ) {
                         Text(
                             text = "Cambiar foto",
@@ -527,8 +590,8 @@ private fun ProductFormDialog(
                             color = colors.primary
                         )
                         Text(
-                            text = "Opcional · JPG o PNG",
-                            style = MaterialTheme.typography.bodyMedium,
+                            text = "Se ajusta automáticamente al centro",
+                            style = MaterialTheme.typography.bodySmall,
                             color = colors.onSurfaceVariant
                         )
                     }
@@ -599,6 +662,68 @@ private fun ProductFormDialog(
 }
 
 @Composable
+private fun ProductMobileListCard(
+    product: Product,
+    onEditRequest: () -> Unit,
+    onToggleRequest: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = if (product.isActive) colors.surfaceVariant.copy(alpha = 0.35f) else colors.errorContainer.copy(alpha = 0.16f),
+        border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.35f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            ProductImage(
+                imageUri = product.imageUri,
+                fallbackLabel = product.name.take(1).uppercase(),
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .alpha(if (product.isActive) 1f else 0.5f)
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = product.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "${product.category} · ${product.stock} un.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (product.stock < 5) colors.error else colors.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "$${String.format(Locale.US, "%,.0f", product.price)}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.primary
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                EditActionButton(onClick = onEditRequest)
+                ToggleActionButton(isActive = product.isActive, onClick = onToggleRequest)
+            }
+        }
+    }
+}
+
+@Composable
 private fun ProductTableRow(
     product: Product,
     onEditRequest: () -> Unit,
@@ -651,7 +776,9 @@ private fun ProductTableRow(
                     product.name,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (product.isActive) colors.onSurface else colors.onSurface.copy(alpha = 0.6f)
+                    color = if (product.isActive) colors.onSurface else colors.onSurface.copy(alpha = 0.6f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
@@ -741,23 +868,25 @@ private fun ToggleActionButton(isActive: Boolean, onClick: () -> Unit) {
 @Composable
 private fun ProductGalleryCard(
     product: Product,
+    compact: Boolean = false,
+    modifier: Modifier = Modifier,
     onEditRequest: () -> Unit,
     onToggleRequest: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier,
         shape = RoundedCornerShape(18.dp),
         border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.4f)),
         colors = CardDefaults.cardColors(containerColor = colors.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
         Column {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(140.dp)
+                    .aspectRatio(1f)
             ) {
                 ProductImage(
                     imageUri = product.imageUri,
@@ -770,7 +899,7 @@ private fun ProductGalleryCard(
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(10.dp)
+                        .padding(8.dp)
                 ) {
                     if (product.isActive) {
                         StatusBadge(text = "Activo", style = StatusBadgeStyle.SUCCESS)
@@ -781,12 +910,12 @@ private fun ProductGalleryCard(
             }
 
             Column(
-                modifier = Modifier.padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.padding(if (compact) 10.dp else 14.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
                     text = product.name,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = colors.onSurface,
                     maxLines = 1,
@@ -798,10 +927,12 @@ private fun ProductGalleryCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    CategoryTag(name = product.category)
+                    if (!compact) {
+                        CategoryTag(name = product.category)
+                    }
                     Text(
                         "${product.stock} un.",
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodySmall,
                         fontWeight = if (product.stock < 5) FontWeight.Bold else FontWeight.Normal,
                         color = if (product.stock < 5) colors.error else colors.onSurfaceVariant
                     )
@@ -814,11 +945,13 @@ private fun ProductGalleryCard(
                 ) {
                     Text(
                         "$${String.format(Locale.US, "%,.0f", product.price)}",
-                        style = MaterialTheme.typography.titleLarge,
+                        style = if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = colors.primary
+                        color = colors.primary,
+                        maxLines = 1,
+                        softWrap = false
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                         EditActionButton(onClick = onEditRequest)
                         ToggleActionButton(isActive = product.isActive, onClick = onToggleRequest)
                     }

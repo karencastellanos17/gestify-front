@@ -6,8 +6,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.inventario.data.model.CreateSupplierOrderRequest
 import com.example.inventario.data.model.Product
 import com.example.inventario.data.model.Supplier
+import com.example.inventario.data.model.SupplierOrder
 import com.example.inventario.data.remote.CloudinaryService
 import com.example.inventario.data.repository.AuthRepository
 import com.example.inventario.data.repository.GestifyRepository
@@ -32,6 +34,9 @@ class GestifyViewModel(application: Application) : AndroidViewModel(application)
 
     private val _suppliers = MutableStateFlow<List<Supplier>>(emptyList())
     val suppliers: StateFlow<List<Supplier>> = _suppliers.asStateFlow()
+
+    private val _supplierOrders = MutableStateFlow<List<SupplierOrder>>(emptyList())
+    val supplierOrders: StateFlow<List<SupplierOrder>> = _supplierOrders.asStateFlow()
 
     var isLoading by mutableStateOf(false)
         private set
@@ -66,16 +71,19 @@ class GestifyViewModel(application: Application) : AndroidViewModel(application)
             val productsDeferred = async { repository.getProducts() }
             val salesDeferred = async { repository.getSales() }
             val suppliersDeferred = async { repository.getSuppliers() }
+            val ordersDeferred = async { repository.getSupplierOrders() }
 
             val productsResult = productsDeferred.await()
             val salesResult = salesDeferred.await()
             val suppliersResult = suppliersDeferred.await()
+            val ordersResult = ordersDeferred.await()
 
             productsResult.onSuccess { _products.value = it }
             salesResult.onSuccess { _sales.value = it }
             suppliersResult.onSuccess { _suppliers.value = it }
+            ordersResult.onSuccess { _supplierOrders.value = it }
 
-            val failure = listOf<Result<*>>(productsResult, salesResult, suppliersResult)
+            val failure = listOf<Result<*>>(productsResult, salesResult, suppliersResult, ordersResult)
                 .firstNotNullOfOrNull { it.exceptionOrNull() }
             syncError = failure?.let { "No se pudieron actualizar los datos: ${it.localizedMessage ?: "error desconocido"}" }
         }
@@ -123,6 +131,7 @@ class GestifyViewModel(application: Application) : AndroidViewModel(application)
         _products.value = emptyList()
         _sales.value = emptyList()
         _suppliers.value = emptyList()
+        _supplierOrders.value = emptyList()
         errorMessage = null
         syncError = null
         isLoading = false
@@ -218,6 +227,34 @@ class GestifyViewModel(application: Application) : AndroidViewModel(application)
                 onSuccess = { loadAll() },
                 onFailure = { syncError = "No se pudo cambiar el estado del proveedor: ${it.localizedMessage}" }
             )
+        }
+    }
+
+    fun createSupplierOrder(request: CreateSupplierOrderRequest, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            isLoading = true
+            errorMessage = null
+            repository.createSupplierOrder(request).fold(
+                onSuccess = {
+                    loadAll()
+                    onSuccess()
+                },
+                onFailure = {
+                    errorMessage = it.localizedMessage ?: "Error al registrar el pedido"
+                }
+            )
+            isLoading = false
+        }
+    }
+
+    fun receiveSupplierOrder(orderId: Int) {
+        viewModelScope.launch {
+            isLoading = true
+            repository.receiveSupplierOrder(orderId).fold(
+                onSuccess = { loadAll() },
+                onFailure = { syncError = "No se pudo recibir el pedido: ${it.localizedMessage}" }
+            )
+            isLoading = false
         }
     }
 
