@@ -8,10 +8,17 @@ data class Supplier(
     @SerializedName("idNegocio", alternate = ["id_negocio", "businessId"])
     val idNegocio: Long? = null,
 
-    val name: String = "",              // Nombre o empresa
-    val contactName: String = "",       // Persona de contacto
-    val phone: String = "",             // Solo informativo
-    val category: String = "",          // Qué tipo de productos distribuye
+    @SerializedName("name")
+    private val _name: String? = "",
+
+    @SerializedName("contactName", alternate = ["contact_name"])
+    private val _contactName: String? = "",
+
+    @SerializedName("phone")
+    private val _phone: String? = "",
+
+    @SerializedName("category")
+    private val _category: String? = "",
 
     @SerializedName("productIds", alternate = ["productosIds", "product_ids"])
     private val _productIds: List<Int>? = emptyList(),
@@ -21,6 +28,18 @@ data class Supplier(
 
     val isActive: Boolean = true        // Soft Delete
 ) {
+    val name: String
+        get() = _name.orEmpty()
+
+    val contactName: String
+        get() = _contactName.orEmpty()
+
+    val phone: String
+        get() = _phone.orEmpty()
+
+    val category: String
+        get() = _category.orEmpty()
+
     val productIds: List<Int>
         get() = _productIds.orEmpty()
 

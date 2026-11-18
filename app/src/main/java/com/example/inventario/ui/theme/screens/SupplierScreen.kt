@@ -22,7 +22,6 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Inventory
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocalShipping
-import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Restore
@@ -401,10 +400,10 @@ fun SuppliersScreen(
             onConfirm = { name, contactName, phone, category, productIds, extraItems ->
                 val newSupplier = Supplier(
                     id = 0,
-                    name = name,
-                    contactName = contactName,
-                    phone = phone,
-                    category = category,
+                    _name = name,
+                    _contactName = contactName,
+                    _phone = phone,
+                    _category = category,
                     _productIds = productIds,
                     _extraItems = extraItems,
                     isActive = true
@@ -428,10 +427,10 @@ fun SuppliersScreen(
             },
             onConfirm = { name, contactName, phone, category, productIds, extraItems ->
                 val updatedSupplier = target.copy(
-                    name = name,
-                    contactName = contactName,
-                    phone = phone,
-                    category = category,
+                    _name = name,
+                    _contactName = contactName,
+                    _phone = phone,
+                    _category = category,
                     _productIds = productIds,
                     _extraItems = extraItems
                 )
@@ -497,7 +496,6 @@ private fun CreateSupplierOrderDialog(
     var selectedSupplierId by remember(initialSupplier) { mutableIntStateOf(initialSupplier.id) }
     val currentSupplier = suppliers.find { it.id == selectedSupplierId } ?: initialSupplier
 
-    // Prioriza productos asociados al proveedor, pero permite elegir cualquiera del inventario
     val suggestedProducts = remember(currentSupplier, products) {
         val linked = products.filter { it.id in currentSupplier.productIds }
         val others = products.filter { it.id !in currentSupplier.productIds }
@@ -527,7 +525,6 @@ private fun CreateSupplierOrderDialog(
     val grandTotalUnits = draftLines.sumOf { it.totalUnits }
     val shippingPerUnit = if (grandTotalUnits > 0) shippingCost / grandTotalUnits else 0.0
 
-    // Proyección de ingresos si vendes todo el pedido a tu precio al público
     val projectedRevenue = draftLines.sumOf { it.totalUnits * it.salePrice }
     val projectedNetProfit = projectedRevenue - totalOrderCost
     val profitMarginPct = if (projectedRevenue > 0) (projectedNetProfit / projectedRevenue) * 100.0 else 0.0
@@ -612,7 +609,6 @@ private fun CreateSupplierOrderDialog(
                 fontWeight = FontWeight.SemiBold
             )
 
-            // Escala: Unidad, Decena (10), Docena (12)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -770,7 +766,6 @@ private fun CreateSupplierOrderDialog(
                         }
                     }
 
-                    // Tarjeta resumen de equilibrio del pedido completo
                     Surface(
                         shape = RoundedCornerShape(14.dp),
                         color = if (projectedNetProfit >= 0) colors.primary.copy(alpha = 0.10f) else colors.errorContainer,

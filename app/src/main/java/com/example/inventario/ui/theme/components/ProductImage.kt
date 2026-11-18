@@ -4,7 +4,9 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
+import android.media.ExifInterface
 import android.net.Uri
+import android.os.Build
 import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -24,13 +26,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.exifinterface.media.ExifInterface
+import androidx.core.net.toUri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.URL
 
 private object ImageMemoryCache {
-    private val cache = object : LruCache<String, ImageBitmap>(30) {}
+    private val cache = LruCache<String, ImageBitmap>(30)
     fun get(key: String): ImageBitmap? = cache.get(key)
     fun put(key: String, bitmap: ImageBitmap) {
         cache.put(key, bitmap)
@@ -47,7 +49,7 @@ fun ProductImage(
     val context = LocalContext.current
     val colors = MaterialTheme.colorScheme
 
-    val bitmap by produceState<ImageBitmap?>(
+    val bitmap by produceState(
         initialValue = imageUri?.let { ImageMemoryCache.get(it) },
         imageUri
     ) {
@@ -63,7 +65,7 @@ fun ProductImage(
             if (imageUri.startsWith("http://") || imageUri.startsWith("https://")) {
                 decodeNetworkBitmap(imageUri)
             } else {
-                decodeSampledBitmap(context, Uri.parse(imageUri), 800)
+                decodeSampledBitmap(context, imageUri.toUri())
             }
         }
         if (loaded != null) {
@@ -97,7 +99,6 @@ fun ProductImage(
 }
 
 private fun decodeNetworkBitmap(urlString: String): ImageBitmap? = try {
-    // Si es Cloudinary, pedir transformación cuadrada centrada 600x600 para carga rápida y encuadre uniforme
     val optimizedUrl = if (urlString.contains("res.cloudinary.com") && urlString.contains("/upload/")) {
         urlString.replace("/upload/", "/upload/c_fill,g_auto,w_600,h_600,q_auto/")
     } else {
@@ -110,7 +111,8 @@ private fun decodeNetworkBitmap(urlString: String): ImageBitmap? = try {
     null
 }
 
-private fun decodeSampledBitmap(context: Context, uri: Uri, maxSide: Int): ImageBitmap? = try {
+private fun decodeSampledBitmap(context: Context, uri: Uri): ImageBitmap? = try {
+    val maxSide = 800
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
 
@@ -122,14 +124,16 @@ private fun decodeSampledBitmap(context: Context, uri: Uri, maxSide: Int): Image
         BitmapFactory.decodeStream(it, null, options)
     } ?: return null
 
-    val rotation = context.contentResolver.openInputStream(uri)?.use { input ->
-        when (ExifInterface(input).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
-            ExifInterface.ORIENTATION_ROTATE_90 -> 90f
-            ExifInterface.ORIENTATION_ROTATE_180 -> 180f
-            ExifInterface.ORIENTATION_ROTATE_270 -> 270f
-            else -> 0f
-        }
-    } ?: 0f
+    val rotation = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            when (ExifInterface(input).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
+                ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+                ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                else -> 0f
+            }
+        } ?: 0f
+    } else 0f
 
     val rotated = if (rotation != 0f) {
         val matrix = Matrix().apply { postRotate(rotation) }
