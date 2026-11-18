@@ -62,14 +62,23 @@ private val bottomNavItems = listOf(
     NavEntry(4, "Ajustes", "Paleta de color y apariencia", Icons.Default.Settings)
 )
 
+private fun parseThemeColor(name: String?): AppThemeColor =
+    AppThemeColor.entries.firstOrNull { it.name.equals(name, ignoreCase = true) } ?: AppThemeColor.BLUE
+
 @Composable
 fun MainScreen(
     onLogout: () -> Unit = {},
     viewModel: GestifyViewModel = viewModel()
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
-    var currentThemeColor by remember { mutableStateOf(AppThemeColor.BLUE) }
-    var isDarkMode by remember { mutableStateOf(false) }
+
+    var currentThemeColor by remember { mutableStateOf(parseThemeColor(viewModel.savedThemeColor())) }
+    var isDarkMode by remember { mutableStateOf(viewModel.savedDarkMode()) }
+
+    fun changeDarkMode(value: Boolean) {
+        isDarkMode = value
+        viewModel.saveThemePreferences(currentThemeColor.name, value)
+    }
 
     val products by viewModel.products.collectAsState()
     val suppliers by viewModel.suppliers.collectAsState()
@@ -99,14 +108,17 @@ fun MainScreen(
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.weight(1f)
                             ) {
                                 GestifyMark(size = 32.dp, onGradient = true)
                                 Text(
                                     text = "Gestify",
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Black,
-                                    color = colors.onPrimary
+                                    color = colors.onPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
 
@@ -125,7 +137,7 @@ fun MainScreen(
                                         tint = if (selectedTab == 4) colors.onPrimary else colors.onPrimary.copy(alpha = 0.75f)
                                     )
                                 }
-                                IconButton(onClick = { isDarkMode = !isDarkMode }) {
+                                IconButton(onClick = { changeDarkMode(!isDarkMode) }) {
                                     Icon(
                                         imageVector = if (isDarkMode) Icons.Default.DarkMode else Icons.Default.LightMode,
                                         contentDescription = "Tema",
@@ -155,6 +167,7 @@ fun MainScreen(
                                     Text(
                                         text = entry.label,
                                         maxLines = 1,
+                                        softWrap = false,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                 },
@@ -189,7 +202,12 @@ fun MainScreen(
                         suppliers = suppliers,
                         currentThemeColor = currentThemeColor,
                         onThemeSelected = { currentThemeColor = it },
-                        isDarkMode = isDarkMode
+                        isDarkMode = isDarkMode,
+                        syncError = viewModel.syncError,
+                        onRetry = {
+                            viewModel.clearSyncError()
+                            viewModel.refreshAllData()
+                        }
                     )
                 }
             }
@@ -204,7 +222,7 @@ fun MainScreen(
                     selectedTab = selectedTab,
                     onSelect = { selectedTab = it },
                     isDarkMode = isDarkMode,
-                    onDarkModeChange = { isDarkMode = it },
+                    onDarkModeChange = { changeDarkMode(it) },
                     compact = compactMenu
                 )
 
@@ -243,7 +261,12 @@ fun MainScreen(
                             suppliers = suppliers,
                             currentThemeColor = currentThemeColor,
                             onThemeSelected = { currentThemeColor = it },
-                            isDarkMode = isDarkMode
+                            isDarkMode = isDarkMode,
+                            syncError = viewModel.syncError,
+                            onRetry = {
+                                viewModel.clearSyncError()
+                                viewModel.refreshAllData()
+                            }
                         )
                     }
                 }
@@ -261,34 +284,76 @@ private fun ScreenContent(
     suppliers: List<com.example.inventario.data.model.Supplier>,
     currentThemeColor: AppThemeColor,
     onThemeSelected: (AppThemeColor) -> Unit,
-    isDarkMode: Boolean
+    isDarkMode: Boolean,
+    syncError: String?,
+    onRetry: () -> Unit
 ) {
-    Crossfade(
-        targetState = selectedTab,
-        animationSpec = tween(durationMillis = 250),
-        label = "ScreenTransition"
-    ) { tab ->
-        when (tab) {
-            0 -> DashboardScreen(
-                onLogout = onLogout,
-                onGoToSales = { onSelectTab(2) },
-                onGoToStock = { onSelectTab(1) },
-                onGoToAlerts = { onSelectTab(3) }
-            )
-            1 -> InventoryScreen()
-            2 -> SalesScreen()
-            3 -> AlertsScreen(
-                products = products,
-                suppliers = suppliers,
-                onGoToSuppliers = { onSelectTab(5) }
-            )
-            4 -> SettingsScreen(
-                selectedThemeColor = currentThemeColor,
-                onThemeSelected = onThemeSelected,
-                isDarkMode = isDarkMode
-            )
-            5 -> SuppliersScreen()
-            6 -> AboutScreen()
+    val colors = MaterialTheme.colorScheme
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        if (syncError != null) {
+            Surface(
+                color = colors.errorContainer,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, top = 12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(start = 14.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = syncError,
+                        color = colors.onErrorContainer,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = onRetry) {
+                        Text(
+                            text = "Reintentar",
+                            color = colors.onErrorContainer,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
+                }
+            }
+        }
+
+        Box(modifier = Modifier.weight(1f)) {
+            Crossfade(
+                targetState = selectedTab,
+                animationSpec = tween(durationMillis = 250),
+                label = "ScreenTransition"
+            ) { tab ->
+                when (tab) {
+                    0 -> DashboardScreen(
+                        onLogout = onLogout,
+                        onGoToSales = { onSelectTab(2) },
+                        onGoToStock = { onSelectTab(1) },
+                        onGoToAlerts = { onSelectTab(3) }
+                    )
+                    1 -> InventoryScreen()
+                    2 -> SalesScreen()
+                    3 -> AlertsScreen(
+                        products = products,
+                        suppliers = suppliers,
+                        onGoToSuppliers = { onSelectTab(5) }
+                    )
+                    4 -> SettingsScreen(
+                        selectedThemeColor = currentThemeColor,
+                        onThemeSelected = onThemeSelected,
+                        isDarkMode = isDarkMode
+                    )
+                    5 -> SuppliersScreen()
+                    6 -> AboutScreen()
+                }
+            }
         }
     }
 }
@@ -445,12 +510,16 @@ private fun GestifySidebar(
                             text = "Gestify",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Black,
-                            color = palette.content
+                            color = palette.content,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = "Gestionar mejor, crecer más",
                             style = MaterialTheme.typography.labelMedium,
-                            color = palette.contentMuted
+                            color = palette.contentMuted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -489,13 +558,16 @@ private fun GestifySidebar(
                                     text = entry.label,
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = palette.content
+                                    color = palette.content,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
                                     text = entry.description,
                                     style = MaterialTheme.typography.labelMedium,
                                     color = palette.contentMuted,
-                                    maxLines = 1
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
@@ -613,6 +685,8 @@ private fun SidebarItem(
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                 color = if (isSelected) palette.selectedText else palette.content,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
 
@@ -675,6 +749,8 @@ private fun DarkModeToggle(
                 text = if (isDarkMode) "Modo oscuro" else "Modo claro",
                 style = MaterialTheme.typography.titleSmall,
                 color = palette.content,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
             Switch(

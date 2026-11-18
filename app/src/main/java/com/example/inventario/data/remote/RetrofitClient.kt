@@ -1,6 +1,7 @@
 package com.example.inventario.data.remote
 
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -12,36 +13,55 @@ object RetrofitClient {
     private const val BASE_URL = "https://gestify-5xyc.onrender.com/"
 
     private var tokenManager: TokenManager? = null
+    private var instance: Retrofit? = null
 
     fun init(context: Context) {
-        tokenManager = TokenManager(context)
+        val appContext = context.applicationContext
+        tokenManager = TokenManager(appContext)
+        val isDebuggable = (appContext.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        instance = buildRetrofit(isDebuggable)
     }
 
-    private val authInterceptor = Interceptor { chain ->
-        val originalRequest = chain.request()
-        val token = tokenManager?.getToken()
+    val retrofit: Retrofit
+        get() = instance ?: error("RetrofitClient.init(context) no fue llamado")
 
-        val requestBuilder = originalRequest.newBuilder()
-        if (!token.isNullOrBlank()) {
-            requestBuilder.addHeader("Authorization", "Bearer $token")
+    private fun buildRetrofit(isDebuggable: Boolean): Retrofit {
+        val authInterceptor = Interceptor { chain ->
+            val request = chain.request()
+            val token = tokenManager?.getToken()
+
+            val builder = request.newBuilder()
+            if (!token.isNullOrBlank()) {
+                builder.addHeader("Authorization", "Bearer $token")
+            }
+
+            val response = chain.proceed(builder.build())
+
+            val isAuthEndpoint = request.url.encodedPath.startsWith("/api/auth/")
+            if (response.code == 401 && !token.isNullOrBlank() && !isAuthEndpoint) {
+                tokenManager?.clear()
+                SessionManager.notifyExpired()
+            }
+            response
         }
 
-        chain.proceed(requestBuilder.build())
+        val logging = HttpLoggingInterceptor().apply {
+            level = if (isDebuggable) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
+            redactHeader("Authorization")
+        }
+
+        val client = OkHttpClient.Builder()
+            .addInterceptor(authInterceptor)
+            .addInterceptor(logging)
+            .connectTimeout(90, TimeUnit.SECONDS)
+            .readTimeout(90, TimeUnit.SECONDS)
+            .writeTimeout(90, TimeUnit.SECONDS)
+            .build()
+
+        return Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
     }
-
-    private val okHttpClient = OkHttpClient.Builder()
-        .addInterceptor(authInterceptor)
-        .addInterceptor(HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
-        })
-        .connectTimeout(60, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
-        .writeTimeout(60, TimeUnit.SECONDS)
-        .build()
-
-    val retrofit: Retrofit = Retrofit.Builder()
-        .baseUrl(BASE_URL)
-        .client(okHttpClient)
-        .addConverterFactory(GsonConverterFactory.create())
-        .build()
 }

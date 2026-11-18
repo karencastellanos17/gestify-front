@@ -1,15 +1,11 @@
 package com.example.inventario.data.remote
 
-
 import com.example.inventario.data.model.Product
 import com.example.inventario.data.model.Supplier
 import com.example.inventario.ui.theme.screens.SaleItem
-import okhttp3.MultipartBody
-import okhttp3.RequestBody
 import retrofit2.Response
 import retrofit2.http.*
 
-// ─── DTOs de Autenticación y Preferencias ───
 data class LoginRequest(val email: String, val password: String)
 data class RegisterRequest(val businessName: String, val email: String, val password: String)
 
@@ -17,6 +13,7 @@ data class AuthResponse(
     val token: String,
     val idNegocio: Long,
     val businessName: String,
+    val email: String? = null,
     val themeColor: String?,
     val isDarkMode: Boolean
 )
@@ -28,22 +25,17 @@ data class PreferencesRequest(
 
 interface GestifyApi {
 
-    // ─── Auth ───
     @POST("api/auth/login")
     suspend fun login(@Body request: LoginRequest): Response<AuthResponse>
 
     @POST("api/auth/register")
     suspend fun register(@Body request: RegisterRequest): Response<AuthResponse>
 
-    // ─── Productos ───
     @GET("api/products")
-    suspend fun getProducts(@Query("id_negocio") businessId: Long): Response<List<Product>>
+    suspend fun getProducts(): Response<List<Product>>
 
     @POST("api/products")
-    suspend fun createProduct(
-        @Query("id_negocio") businessId: Long,
-        @Body product: Product
-    ): Response<Product>
+    suspend fun createProduct(@Body product: Product): Response<Product>
 
     @PUT("api/products/{id}")
     suspend fun updateProduct(
@@ -54,25 +46,17 @@ interface GestifyApi {
     @PATCH("api/products/{id}/toggle")
     suspend fun toggleProduct(@Path("id") id: Int): Response<Unit>
 
-    // ─── Ventas ───
     @GET("api/sales")
-    suspend fun getSales(@Query("id_negocio") businessId: Long): Response<List<SaleItem>>
+    suspend fun getSales(): Response<List<SaleItem>>
 
     @POST("api/sales")
-    suspend fun createSale(
-        @Query("id_negocio") businessId: Long,
-        @Body sale: SaleItem
-    ): Response<SaleItem>
+    suspend fun createSale(@Body sale: SaleItem): Response<SaleItem>
 
-    // ─── Proveedores ───
     @GET("api/suppliers")
-    suspend fun getSuppliers(@Query("id_negocio") businessId: Long): Response<List<Supplier>>
+    suspend fun getSuppliers(): Response<List<Supplier>>
 
     @POST("api/suppliers")
-    suspend fun createSupplier(
-        @Query("id_negocio") businessId: Long,
-        @Body supplier: Supplier
-    ): Response<Supplier>
+    suspend fun createSupplier(@Body supplier: Supplier): Response<Supplier>
 
     @PUT("api/suppliers/{id}")
     suspend fun updateSupplier(
@@ -83,10 +67,6 @@ interface GestifyApi {
     @PATCH("api/suppliers/{id}/toggle")
     suspend fun toggleSupplier(@Path("id") id: Int): Response<Unit>
 
-    // ─── Preferencias del Negocio ───
-    @PUT("api/businesses/{id}/preferences")
-    suspend fun updatePreferences(
-        @Path("id") businessId: Long,
-        @Body preferences: PreferencesRequest
-    ): Response<Unit>
+    @PUT("api/businesses/me/preferences")
+    suspend fun updatePreferences(@Body preferences: PreferencesRequest): Response<Unit>
 }

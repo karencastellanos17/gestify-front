@@ -12,6 +12,8 @@ import com.example.inventario.data.remote.CloudinaryService
 import com.example.inventario.data.repository.AuthRepository
 import com.example.inventario.data.repository.GestifyRepository
 import com.example.inventario.ui.theme.screens.SaleItem
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,7 +35,11 @@ class GestifyViewModel(application: Application) : AndroidViewModel(application)
 
     var isLoading by mutableStateOf(false)
         private set
+
     var errorMessage by mutableStateOf<String?>(null)
+        private set
+
+    var syncError by mutableStateOf<String?>(null)
         private set
 
     init {
@@ -46,29 +52,50 @@ class GestifyViewModel(application: Application) : AndroidViewModel(application)
         errorMessage = null
     }
 
-    fun refreshAllData() {
-        viewModelScope.launch {
-            isLoading = true
-            _products.value = repository.getProducts()
-            _sales.value = repository.getSales()
-            _suppliers.value = repository.getSuppliers()
-            isLoading = false
-        }
+    fun clearSyncError() {
+        syncError = null
     }
 
-    // --- Autenticación ---
+    fun refreshAllData() {
+        viewModelScope.launch { loadAll() }
+    }
+
+    private suspend fun loadAll() {
+        isLoading = true
+        coroutineScope {
+            val productsDeferred = async { repository.getProducts() }
+            val salesDeferred = async { repository.getSales() }
+            val suppliersDeferred = async { repository.getSuppliers() }
+
+            val productsResult = productsDeferred.await()
+            val salesResult = salesDeferred.await()
+            val suppliersResult = suppliersDeferred.await()
+
+            productsResult.onSuccess { _products.value = it }
+            salesResult.onSuccess { _sales.value = it }
+            suppliersResult.onSuccess { _suppliers.value = it }
+
+            val failure = listOf<Result<*>>(productsResult, salesResult, suppliersResult)
+                .firstNotNullOfOrNull { it.exceptionOrNull() }
+            syncError = failure?.let { "No se pudieron actualizar los datos: ${it.localizedMessage ?: "error desconocido"}" }
+        }
+        isLoading = false
+    }
+
     fun login(email: String, pass: String, onSuccess: () -> Unit) {
         viewModelScope.launch {
             isLoading = true
             errorMessage = null
             val result = authRepository.login(email, pass)
-            isLoading = false
             result.fold(
                 onSuccess = {
-                    refreshAllData()
+                    loadAll()
                     onSuccess()
                 },
-                onFailure = { errorMessage = it.localizedMessage ?: "Error al iniciar sesión" }
+                onFailure = {
+                    errorMessage = it.localizedMessage ?: "Error al iniciar sesión"
+                    isLoading = false
+                }
             )
         }
     }
@@ -78,13 +105,15 @@ class GestifyViewModel(application: Application) : AndroidViewModel(application)
             isLoading = true
             errorMessage = null
             val result = authRepository.register(businessName, email, pass)
-            isLoading = false
             result.fold(
                 onSuccess = {
-                    refreshAllData()
+                    loadAll()
                     onSuccess()
                 },
-                onFailure = { errorMessage = it.localizedMessage ?: "Error al registrarse" }
+                onFailure = {
+                    errorMessage = it.localizedMessage ?: "Error al registrarse"
+                    isLoading = false
+                }
             )
         }
     }
@@ -94,9 +123,11 @@ class GestifyViewModel(application: Application) : AndroidViewModel(application)
         _products.value = emptyList()
         _sales.value = emptyList()
         _suppliers.value = emptyList()
+        errorMessage = null
+        syncError = null
+        isLoading = false
     }
 
-    // --- Productos (Crear o Editar + Cloudinary) ---
     fun createProductWithImage(product: Product, imageFile: File?, onSuccess: () -> Unit) {
         viewModelScope.launch {
             isLoading = true
@@ -105,9 +136,12 @@ class GestifyViewModel(application: Application) : AndroidViewModel(application)
 
             if (imageFile != null) {
                 val uploadedUrl = CloudinaryService.uploadImage(imageFile)
-                if (uploadedUrl != null) {
-                    finalImageUrl = uploadedUrl
+                if (uploadedUrl == null) {
+                    errorMessage = "No se pudo subir la imagen. Revisa tu conexión e intenta de nuevo."
+                    isLoading = false
+                    return@launch
                 }
+                finalImageUrl = uploadedUrl
             }
 
             val productToSave = product.copy(imageUri = finalImageUrl)
@@ -119,7 +153,7 @@ class GestifyViewModel(application: Application) : AndroidViewModel(application)
 
             result.fold(
                 onSuccess = {
-                    refreshAllData()
+                    loadAll()
                     onSuccess()
                 },
                 onFailure = {
@@ -132,21 +166,20 @@ class GestifyViewModel(application: Application) : AndroidViewModel(application)
 
     fun toggleProduct(id: Int) {
         viewModelScope.launch {
-            if (repository.toggleProduct(id)) {
-                refreshAllData()
-            }
+            repository.toggleProduct(id).fold(
+                onSuccess = { loadAll() },
+                onFailure = { syncError = "No se pudo cambiar el estado del producto: ${it.localizedMessage}" }
+            )
         }
     }
 
-    // --- Ventas ---
     fun createSale(sale: SaleItem, onSuccess: () -> Unit) {
         viewModelScope.launch {
             isLoading = true
             errorMessage = null
-            val result = repository.createSale(sale)
-            result.fold(
+            repository.createSale(sale).fold(
                 onSuccess = {
-                    refreshAllData()
+                    loadAll()
                     onSuccess()
                 },
                 onFailure = {
@@ -157,7 +190,6 @@ class GestifyViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // --- Proveedores (Crear o Editar) ---
     fun createSupplier(supplier: Supplier, onSuccess: () -> Unit) {
         viewModelScope.launch {
             isLoading = true
@@ -169,7 +201,7 @@ class GestifyViewModel(application: Application) : AndroidViewModel(application)
             }
             result.fold(
                 onSuccess = {
-                    refreshAllData()
+                    loadAll()
                     onSuccess()
                 },
                 onFailure = {
@@ -182,20 +214,21 @@ class GestifyViewModel(application: Application) : AndroidViewModel(application)
 
     fun toggleSupplier(id: Int) {
         viewModelScope.launch {
-            if (repository.toggleSupplier(id)) {
-                refreshAllData()
-            }
+            repository.toggleSupplier(id).fold(
+                onSuccess = { loadAll() },
+                onFailure = { syncError = "No se pudo cambiar el estado del proveedor: ${it.localizedMessage}" }
+            )
         }
     }
 
-    // --- Preferencias ---
-    fun updatePreferences(themeColor: String, isDarkMode: Boolean) {
+    fun savedThemeColor(): String = authRepository.getThemeColor()
+
+    fun savedDarkMode(): Boolean = authRepository.getDarkMode()
+
+    fun saveThemePreferences(themeColor: String, isDarkMode: Boolean) {
+        authRepository.saveTheme(themeColor, isDarkMode)
         viewModelScope.launch {
             repository.updatePreferences(themeColor, isDarkMode)
         }
-    }
-
-    fun saveThemePreferences(themeColor: String, isDarkMode: Boolean) {
-        updatePreferences(themeColor, isDarkMode)
     }
 }
