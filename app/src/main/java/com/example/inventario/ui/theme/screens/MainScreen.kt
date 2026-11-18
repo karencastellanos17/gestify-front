@@ -89,8 +89,6 @@ fun MainScreen(
     val screenWidth = config.screenWidthDp
     val screenHeight = config.screenHeightDp
 
-    // Celular vertical (< 600dp de ancho) -> Barra superior + Barra inferior
-    // Celular horizontal (ancho >= 600dp y alto < 500dp) o Tablet -> Barra lateral con scroll
     val isPortraitPhone = screenWidth < 600
     val isLandscapePhone = !isPortraitPhone && screenHeight < 500
     val compactMenu = screenWidth < 1100 || isLandscapePhone
@@ -466,7 +464,7 @@ private fun GestifySidebar(
         if (isDarkMode) {
             Box(
                 modifier = Modifier
-                    .matchParentSize()
+                    .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
                             0f to colors.primary.copy(alpha = 0.08f),
@@ -477,7 +475,7 @@ private fun GestifySidebar(
             )
         }
 
-        Canvas(modifier = Modifier.matchParentSize()) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
             val cy = h * (0.12f + 0.70f * shift)

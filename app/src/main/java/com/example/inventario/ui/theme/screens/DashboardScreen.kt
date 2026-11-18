@@ -61,8 +61,12 @@ fun DashboardScreen(
         .map { (category, items) -> category to items.sumOf { it.stock } }
         .filter { it.second > 0 }
 
-    val screenWidth = LocalConfiguration.current.screenWidthDp
-    val isPhone = screenWidth < 700
+    val config = LocalConfiguration.current
+    val screenWidth = config.screenWidthDp
+    val screenHeight = config.screenHeightDp
+
+    // Si la pantalla es angosta (vertical) o el alto es muy pequeño (celular horizontal), apilamos en vertical
+    val isCompact = screenWidth < 700 || screenHeight < 550
     val showLogo = screenWidth >= 1100
 
     Column(
@@ -72,6 +76,7 @@ fun DashboardScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // Banner Principal
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -87,7 +92,7 @@ fun DashboardScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = if (isPhone) 20.dp else 32.dp, vertical = 22.dp),
+                    .padding(horizontal = if (isCompact) 20.dp else 32.dp, vertical = 22.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Row(
@@ -135,7 +140,7 @@ fun DashboardScreen(
 
                 Text(
                     text = "¡Bienvenido a Gestify!",
-                    style = if (isPhone) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.headlineLarge,
+                    style = if (isCompact) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.headlineLarge,
                     color = colors.onPrimary
                 )
                 Text(
@@ -167,7 +172,8 @@ fun DashboardScreen(
             }
         }
 
-        if (isPhone) {
+        // Tarjetas de Métricas Superiores (Responsivas sin IntrinsicSize)
+        if (isCompact) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 MetricCard(
                     title = "Ventas del Día",
@@ -194,7 +200,40 @@ fun DashboardScreen(
                     onClick = onGoToAlerts
                 )
             }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                MetricCard(
+                    title = "Ventas del Día",
+                    value = "$${String.format(Locale.US, "%,.0f", salesTotal)}",
+                    subtitle = "${sales.size} transacciones",
+                    badgeStyle = StatusBadgeStyle.SUCCESS,
+                    modifier = Modifier.weight(1f),
+                    onClick = onGoToSales
+                )
+                MetricCard(
+                    title = "Stock Activo",
+                    value = "$stockUnits Unidades",
+                    subtitle = "$categoryCount Categorías",
+                    badgeStyle = StatusBadgeStyle.INFO,
+                    modifier = Modifier.weight(1f),
+                    onClick = onGoToStock
+                )
+                MetricCard(
+                    title = "Alertas Activas",
+                    value = "${stockAlerts.size} Avisos",
+                    subtitle = "$criticalAlerts Stock Crítico",
+                    badgeStyle = if (criticalAlerts > 0) StatusBadgeStyle.DANGER else StatusBadgeStyle.SUCCESS,
+                    modifier = Modifier.weight(1f),
+                    onClick = onGoToAlerts
+                )
+            }
+        }
 
+        // Gráficos (Responsivos sin restricciones forzadas de alto)
+        if (isCompact) {
             ChartCard(
                 title = "Ventas recientes",
                 subtitle = "Total por transacción",
@@ -218,47 +257,13 @@ fun DashboardScreen(
             }
         } else {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(IntrinsicSize.Max),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                MetricCard(
-                    title = "Ventas del Día",
-                    value = "$${String.format(Locale.US, "%,.0f", salesTotal)}",
-                    subtitle = "${sales.size} transacciones",
-                    badgeStyle = StatusBadgeStyle.SUCCESS,
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
-                    onClick = onGoToSales
-                )
-                MetricCard(
-                    title = "Stock Activo",
-                    value = "$stockUnits Unidades",
-                    subtitle = "$categoryCount Categorías",
-                    badgeStyle = StatusBadgeStyle.INFO,
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
-                    onClick = onGoToStock
-                )
-                MetricCard(
-                    title = "Alertas Activas",
-                    value = "${stockAlerts.size} Avisos",
-                    subtitle = "$criticalAlerts Stock Crítico",
-                    badgeStyle = if (criticalAlerts > 0) StatusBadgeStyle.DANGER else StatusBadgeStyle.SUCCESS,
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
-                    onClick = onGoToAlerts
-                )
-            }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(IntrinsicSize.Max),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 ChartCard(
                     title = "Ventas recientes",
                     subtitle = "Total por transacción",
-                    modifier = Modifier.weight(1.5f).fillMaxHeight()
+                    modifier = Modifier.weight(1.5f)
                 ) {
                     SalesBarChart(
                         data = salesChartData,
@@ -268,7 +273,7 @@ fun DashboardScreen(
                 ChartCard(
                     title = "Stock por categoría",
                     subtitle = "Unidades de productos activos",
-                    modifier = Modifier.weight(1f).fillMaxHeight()
+                    modifier = Modifier.weight(1f)
                 ) {
                     StockDonutChart(
                         data = stockChartData,
